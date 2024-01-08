@@ -40,15 +40,15 @@ We would use gRPC as a service interface. Below is the proto definition:
     string note = 7
   }
 
-  message ReservationRequest {
+  message CreateRequest {
     Reservation reservation = 1;
   }
 
-  message ReservationResponse {
+  message CreateResponse {
     Reservation reservation = 1;
   }
 
-  message ReservationUpdate {
+  message updateRequest {
     ReservationStatus status = 1;
     note = 2;
   }
@@ -92,13 +92,56 @@ We would use gRPC as a service interface. Below is the proto definition:
   }
 
   service ReservationService {
-    rpc create(ReservationRequest) returns (ReservationResponse);
+    rpc create(CreateRequest) returns (CreateResponse);
     rpc confirm(ConfirmRequest) returns (ConfirmResponse);
-    rpc update(ReservationUpdate) returns (UpdateResponse);
+    rpc update(updateRequest) returns (UpdateResponse);
     rpc cancel(CancelRequest) returns (CancelResponse);
     rpc get(GetRequest) returns (GetResponse);
     rpc query(QueryRequest) returns (stream Reservation);
   }
+```
+
+### Database schema
+
+We would use postgres as the database. Below is the schema:
+
+```sql
+CREATE SCHEMA rsvp;
+CREATE TYPE rsvp.reservation_status AS ENUM (
+  'unknown',
+  'pending',
+  'confirmed',
+  'blocked'
+);
+
+CREATE OR REPLACE FUNCTION rsvp.update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER update_updated_at BEFORE UPDATE ON rsvp.reservation
+FOR EACH ROW EXECUTE PROCEDURE rsvp.update_updated_at_column();
+
+CREATE TABLE rsvp.reservation (
+  id UUID NOT NULL DEFAULT uuid_generate_v4(),
+  resource_id varchar(64 ) NOT NULL,
+  user_id varchar(64) NOT NULL,
+  status rsvp.reservation_status NOT NULL DEFAULT 'pending',
+  timespan tstzrange NOT NULL,
+  note text,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ,
+
+  CONSTRAINT reservation_pkey PRIMARY KEY (id),
+  CONSTRAINT reservations_conflict EXCLUDE USING gist (resource_id WITH =, timespan WITH &&)
+);
+
+CREATE INDEX reservation_resource_id_idx ON rsvp.reservation (resource_id);
+
+CREATE INDEX reservation_user_id_idx ON rsvp.reservation (user_id);
 ```
 
 ## Reference-level explanation
