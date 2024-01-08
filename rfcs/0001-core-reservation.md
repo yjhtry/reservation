@@ -1,6 +1,6 @@
-# Core Reservation
+# Core Reservation Service
 
-- Feature Name: core-reservation
+- Feature Name: core-reservation-service
 - Start Date: 2024-01-07 19:23:10
 
 ## Summary
@@ -15,13 +15,91 @@ We need a common solution for various reservation requirements: 1) calender book
 
 Basic architecture:
 
-![architecture](images/arch1.png)
+![Basic arch](images/arch1.png)
 
 ### Service interface
 
-We would use gRPC as a service interface.
+We would use gRPC as a service interface. Below is the proto definition:
 
-E
+```proto
+  enum ReservationStatus {
+    UNKNOWN = 0;
+    PENDING = 1;
+    CONFIRMED = 2;
+    BLOCKED = 3;
+  }
+
+  message Reservation {
+    string id = 1;
+    string resource_id = 2;
+    string user_id = 3;
+
+    ReservationStatus status = 4;
+    google.protobuf.Timestamp start = 5;
+    google.protobuf.Timestamp end = 6;
+    string note = 7
+  }
+
+  message ReservationRequest {
+    Reservation reservation = 1;
+  }
+
+  message ReservationResponse {
+    Reservation reservation = 1;
+  }
+
+  message ReservationUpdate {
+    ReservationStatus status = 1;
+    note = 2;
+  }
+
+  message UpdateResponse {
+    Reservation reservation = 1;
+  }
+
+  message ConfirmRequest {
+    string id = 1
+  }
+
+  message ConfirmResponse {
+    Reservation reservation = 1;
+  }
+
+  message CancelRequest {
+    string id = 1;
+  }
+
+  message CancelResponse {
+    Reservation reservation = 1;
+  }
+
+  message GetRequest {
+    string id = 1;
+  }
+
+  message GetResponse {
+    Reservation reservation = 1;
+  }
+
+  message QueryRequest {
+    string resource_id = 1;
+    string user_id = 2;
+
+    // use status to filter result, If UNKNOWN return all reservations
+    ReservationStatus status = 3;
+    google.protobuf.Timestamp start = 4;
+    google.protobuf.Timestamp end = 5;
+  }
+
+  service ReservationService {
+    rpc create(ReservationRequest) returns (ReservationResponse);
+    rpc confirm(ConfirmRequest) returns (ConfirmResponse);
+    rpc update(ReservationUpdate) returns (UpdateResponse);
+    rpc cancel(CancelRequest) returns (CancelResponse);
+    rpc get(GetRequest) returns (GetResponse);
+    rpc query(QueryRequest) returns (stream Reservation);
+  }
+```
 
 ## Reference-level explanation
 
