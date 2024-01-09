@@ -40,11 +40,11 @@ We would use gRPC as a service interface. Below is the proto definition:
     string note = 7
   }
 
-  message CreateRequest {
+  message ReserveRequest {
     Reservation reservation = 1;
   }
 
-  message CreateResponse {
+  message ReserveResponse {
     Reservation reservation = 1;
   }
 
@@ -91,13 +91,21 @@ We would use gRPC as a service interface. Below is the proto definition:
     google.protobuf.Timestamp end = 5;
   }
 
+  message ListenRequest {}
+
+  message ListenResponse {
+    Reservation reservation = 1;
+  }
+
   service ReservationService {
-    rpc create(CreateRequest) returns (CreateResponse);
+    rpc reserve(ReserveRequest) returns (ReserveResponse);
     rpc confirm(ConfirmRequest) returns (ConfirmResponse);
     rpc update(updateRequest) returns (UpdateResponse);
     rpc cancel(CancelRequest) returns (CancelResponse);
     rpc get(GetRequest) returns (GetResponse);
     rpc query(QueryRequest) returns (stream Reservation);
+    // another system can monitor the reservations and newly reserved/confirmed/canceled reservations
+    rpc listen(ListenRequest) returns (stream ListenResponse);
   }
 ```
 
@@ -112,6 +120,13 @@ CREATE TYPE rsvp.reservation_status AS ENUM (
   'pending',
   'confirmed',
   'blocked'
+);
+
+CREATE TYPE rsvp.reservation_update_type AS ENUM (
+  'unknown',
+  'create',
+  'update',
+  'delete'
 );
 
 CREATE OR REPLACE FUNCTION rsvp.update_updated_at_column()
@@ -142,6 +157,38 @@ CREATE TABLE rsvp.reservation (
 CREATE INDEX reservation_resource_id_idx ON rsvp.reservation (resource_id);
 
 CREATE INDEX reservation_user_id_idx ON rsvp.reservation (user_id);
+
+-- if user_id is null, then return all reservations within the during
+-- if resource_id is null, then return all reservations within the during
+CREATE OR REPLACE FUNCTION rsvp.query(user_id varchar(64), resource_id varchar(64), during tstzrange) RETURNS TABLE rsvp.reservation AS $$ $$ LANGUAGE plpgsql;
+
+-- reservation change queue
+CREATE TABLE rsvp.reservation_change (
+  id SERIAL NOT NULL,
+  reservation_id varchar(64) NOT NULL,
+  op rsvp.reservation_update_type NOT NULL,
+);
+
+-- trigger for add/update/delete reservation
+CREATE OR REPLACE FUNCTION rsvp.reservation_trigger() RETURNS TRIGGER AS $$
+BEGIN
+  IF (TG_OP = 'INSERT') THEN
+    INSERT INTO rsvp.reservation_change (reservation_id, op) VALUES (NEW.id, 'create');
+  ELSIF (TG_OP = 'UPDATE') THEN
+    IF (OLD.status <> NEW.status) THEN
+      INSERT INTO rsvp.reservation_change (reservation_id, op) VALUES (NEW.id, 'update');
+    END IF;
+  ELSIF (TG_OP = 'DELETE') THEN
+    INSERT INTO rsvp.reservation_change (reservation_id, op) VALUES (OLD.id, 'delete');
+  END IF;
+  -- notify a channel called reservation_update
+  NOTIFY reservation_update;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER reservation_trigger AFTER INSERT OR UPDATE OR DELETE ON rsvp.reservation
+FOR EACH ROW EXECUTE PROCEDURE rsvp.reservation_trigger();
 ```
 
 ## Reference-level explanation
