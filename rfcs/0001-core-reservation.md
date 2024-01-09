@@ -22,91 +22,106 @@ Basic architecture:
 We would use gRPC as a service interface. Below is the proto definition:
 
 ```proto
-  enum ReservationStatus {
-    UNKNOWN = 0;
-    PENDING = 1;
-    CONFIRMED = 2;
-    BLOCKED = 3;
-  }
+ syntax = "proto3";
 
-  message Reservation {
-    string id = 1;
-    string resource_id = 2;
-    string user_id = 3;
+package reservation;
 
-    ReservationStatus status = 4;
-    google.protobuf.Timestamp start = 5;
-    google.protobuf.Timestamp end = 6;
-    string note = 7
-  }
+import "google/protobuf/timestamp.proto";
 
-  message ReserveRequest {
-    Reservation reservation = 1;
-  }
 
-  message ReserveResponse {
-    Reservation reservation = 1;
-  }
+enum ReservationStatus {
+  RESERVATION_STATUS_UNKNOWN = 0;
+  RESERVATION_STATUS_PENDING = 1;
+  RESERVATION_STATUS_CONFIRMED = 2;
+  RESERVATION_STATUS_BLOCKED = 3;
+}
 
-  message updateRequest {
-    ReservationStatus status = 1;
-    note = 2;
-  }
+enum ReservationType {
+  RESERVATION_TYPE_UNKNOWN = 0;
+  RESERVATION_TYPE_CREATE = 1;
+  RESERVATION_TYPE_UPDATE = 2;
+  RESERVATION_TYPE_DELETE = 3;
+}
 
-  message UpdateResponse {
-    Reservation reservation = 1;
-  }
+message Reservation {
+  string id = 1;
+  string resource_id = 2;
+  string user_id = 3;
 
-  message ConfirmRequest {
-    string id = 1
-  }
+  ReservationStatus status = 4;
+  google.protobuf.Timestamp start = 5;
+  google.protobuf.Timestamp end = 6;
+  string note = 7;
+}
 
-  message ConfirmResponse {
-    Reservation reservation = 1;
-  }
+message ReserveRequest {
+  Reservation reservation = 1;
+}
 
-  message CancelRequest {
-    string id = 1;
-  }
+message ReserveResponse {
+  Reservation reservation = 1;
+}
 
-  message CancelResponse {
-    Reservation reservation = 1;
-  }
+message updateRequest {
+  ReservationStatus status = 1;
+  string note = 2;
+}
 
-  message GetRequest {
-    string id = 1;
-  }
+message UpdateResponse {
+  Reservation reservation = 1;
+}
 
-  message GetResponse {
-    Reservation reservation = 1;
-  }
+message ConfirmRequest {
+  string id = 1;
+}
 
-  message QueryRequest {
-    string resource_id = 1;
-    string user_id = 2;
+message ConfirmResponse {
+  Reservation reservation = 1;
+}
 
-    // use status to filter result, If UNKNOWN return all reservations
-    ReservationStatus status = 3;
-    google.protobuf.Timestamp start = 4;
-    google.protobuf.Timestamp end = 5;
-  }
+message CancelRequest {
+  string id = 1;
+}
 
-  message ListenRequest {}
+message CancelResponse {
+  Reservation reservation = 1;
+}
 
-  message ListenResponse {
-    Reservation reservation = 1;
-  }
+message GetRequest {
+  string id = 1;
+}
 
-  service ReservationService {
-    rpc reserve(ReserveRequest) returns (ReserveResponse);
-    rpc confirm(ConfirmRequest) returns (ConfirmResponse);
-    rpc update(updateRequest) returns (UpdateResponse);
-    rpc cancel(CancelRequest) returns (CancelResponse);
-    rpc get(GetRequest) returns (GetResponse);
-    rpc query(QueryRequest) returns (stream Reservation);
-    // another system can monitor the reservations and newly reserved/confirmed/canceled reservations
-    rpc listen(ListenRequest) returns (stream ListenResponse);
-  }
+message GetResponse {
+  Reservation reservation = 1;
+}
+
+message QueryRequest {
+  string resource_id = 1;
+  string user_id = 2;
+
+  // use status to filter result, If UNKNOWN return all reservations
+  ReservationStatus status = 3;
+  google.protobuf.Timestamp start = 4;
+  google.protobuf.Timestamp end = 5;
+}
+
+message ListenRequest {}
+
+message ListenResponse {
+  ReservationType op = 1;
+  Reservation reservation = 2;
+}
+
+service ReservationService {
+  rpc reserve(ReserveRequest) returns (ReserveResponse);
+  rpc confirm(ConfirmRequest) returns (ConfirmResponse);
+  rpc update(updateRequest) returns (UpdateResponse);
+  rpc cancel(CancelRequest) returns (CancelResponse);
+  rpc get(GetRequest) returns (GetResponse);
+  rpc query(QueryRequest) returns (stream Reservation);
+  // another system can monitor the reservations and newly reserved/confirmed/canceled reservations
+  rpc listen(ListenRequest) returns (stream ListenResponse);
+}
 ```
 
 ### Database schema
