@@ -170,19 +170,8 @@ CREATE TYPE rsvp.reservation_update_type AS ENUM (
   'delete'
 );
 
-CREATE OR REPLACE FUNCTION rsvp.update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE 'plpgsql';
-
-CREATE TRIGGER update_updated_at BEFORE UPDATE ON rsvp.reservation
-FOR EACH ROW EXECUTE PROCEDURE rsvp.update_updated_at_column();
-
 CREATE TABLE rsvp.reservation (
-  id UUID NOT NULL DEFAULT uuid_generate_v4(),
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
   resource_id varchar(64 ) NOT NULL,
   user_id varchar(64) NOT NULL,
   status rsvp.reservation_status NOT NULL DEFAULT 'pending',
@@ -198,11 +187,43 @@ CREATE TABLE rsvp.reservation (
 CREATE INDEX reservation_resource_id_idx ON rsvp.reservation (resource_id);
 CREATE INDEX reservation_user_id_idx ON rsvp.reservation (user_id);
 
--- if user_id is null, then return all reservations within the during
--- if resource_id is null, then return all reservations within the during
--- if both are null, then return all reservations within the during
--- if both set, then return all reservations within the during for the resource and user
-CREATE OR REPLACE FUNCTION rsvp.query(user_id varchar(64), resource_id varchar(64), during tstzrange) RETURNS TABLE rsvp.reservation AS $$ $$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION rsvp.update_updated_at_column()
+  RETURNS TRIGGER AS $$
+  BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+  END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER update_updated_at BEFORE UPDATE ON rsvp.reservation
+FOR EACH ROW EXECUTE PROCEDURE rsvp.update_updated_at_column();
+
+CREATE OR REPLACE FUNCTION rsvp.query(user_id varchar(64), resource_id varchar(64), during tstzrange) RETURNS TABLE (LIKE rsvp.reservation)
+AS $$
+BEGIN
+  -- if user_id is null, then return all reservations within the during
+  IF user_id IS NULL THEN
+      RETURN QUERY
+      SELECT * FROM rsvp.reservation WHERE rsvp.resource_id = resource_id AND during @> rsvp.reservation.timespan;
+  -- if resource_id is null, then return all reservations within the during
+  ELSIF resource_id IS NULL THEN
+      RETURN QUERY
+      SELECT * FROM rsvp.reservation WHERE rsvp.user_id = user_id AND during @> rsvp.reservation.timespan;
+  -- if both are null, then return all reservations within the during
+  ELSIF user_id IS NULL AND resource_id IS NULL THEN
+      RETURN QUERY
+      SELECT * FROM rsvp.reservation WHERE during @> rsvp.reservation.timespan;
+  -- if both set, then return all reservations within the during for the resource and user
+  ELSE
+      RETURN QUERY
+      SELECT * FROM rsvp.reservation
+        WHERE rsvp.reservation.user_id = user_id
+            AND rsvp.reservation.resource_id = resource_id
+            AND during @> rsvp.reservation.timespan;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
 
 -- reservation change queue
 CREATE TABLE rsvp.reservation_change (
