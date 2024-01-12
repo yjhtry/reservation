@@ -92,8 +92,7 @@ message GetResponse {
   Reservation reservation = 1;
 }
 
-// query reservation list request data
-message QueryRequest {
+message ReservationQuery {
   string resource_id = 1;
   string user_id = 2;
 
@@ -101,6 +100,11 @@ message QueryRequest {
   ReservationStatus status = 3;
   google.protobuf.Timestamp start = 4;
   google.protobuf.Timestamp end = 5;
+}
+
+// query reservation list request data
+message QueryRequest {
+  ReservationQuery query = 1;
 }
 
 // listen reservation updates request data
