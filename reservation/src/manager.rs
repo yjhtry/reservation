@@ -1,8 +1,11 @@
-use abi::convert_to_utc_time;
+use abi::{convert_to_utc_time, ReservationStatus};
 use async_trait::async_trait;
 use sqlx::{
     postgres::types::PgRange,
-    types::chrono::{DateTime, Utc},
+    types::{
+        chrono::{DateTime, Utc},
+        Uuid,
+    },
     PgPool, Row,
 };
 
@@ -23,21 +26,25 @@ impl Rsvp for ReservationManager {
 
         let timespan: PgRange<DateTime<Utc>> = (start..end).into();
 
-        let id = sqlx::query(
-            "INSERT INTO reservation (user_id, resource_id, timespan, note, status)
-            VALUES ($1, $2, $3, $4, $5)
+        let status = ReservationStatus::try_from(rsvp.status).unwrap_or(ReservationStatus::Pending);
+
+        println!("status: {:?}", rsvp.status.to_string());
+
+        let id: Uuid = sqlx::query(
+            "INSERT INTO rsvp.reservation (user_id, resource_id, timespan, note, status)
+            VALUES ($1, $2, $3, $4, $5::rsvp.reservation_status)
             RETURNING id",
         )
         .bind(rsvp.user_id)
         .bind(rsvp.resource_id)
         .bind(timespan)
         .bind(rsvp.note)
-        .bind(rsvp.status)
+        .bind(status.to_string())
         .fetch_one(&self.pool)
         .await?
         .get(0);
 
-        return_rsvp.id = id;
+        return_rsvp.id = id.to_string();
 
         Ok(return_rsvp)
     }
@@ -91,12 +98,12 @@ mod tests {
     use super::*;
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
     async fn reserve_should_work_for_valid_window() {
-        let _manager = ReservationManager::new(migrated_pool);
+        let manager = ReservationManager::new(migrated_pool);
 
         let start: DateTime<FixedOffset> = "2024-01-01T00:00:00-0700".parse().unwrap();
         let end: DateTime<FixedOffset> = "2024-01-03T00:00:00-0700".parse().unwrap();
 
-        let _rsvp = abi::Reservation {
+        let rsvp = abi::Reservation {
             id: "".to_string(),
             user_id: "user".to_string(),
             resource_id: "resource".to_string(),
@@ -106,5 +113,9 @@ mod tests {
                 .to_string(),
             status: abi::ReservationStatus::Pending as i32,
         };
+
+        let rsvp = manager.reserve(rsvp).await.unwrap();
+
+        assert!(!rsvp.id.is_empty());
     }
 }
