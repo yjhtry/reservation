@@ -1,5 +1,12 @@
 {
   "cSpell.words": [
+    "chrono",
+    "datetime",
+    "nanos",
+    "prost",
+    "sqlx",
+    "subsec",
+    "thiserror",
     "timespan"
   ]
 }

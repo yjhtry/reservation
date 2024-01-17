@@ -1,4 +1,4 @@
-use abi::{convert_to_utc_time, ReservationStatus};
+use abi::ReservationStatus;
 use async_trait::async_trait;
 use sqlx::{
     postgres::types::PgRange,
@@ -14,17 +14,11 @@ use crate::{ReservationError, ReservationId, ReservationManager, Rsvp};
 #[async_trait]
 impl Rsvp for ReservationManager {
     async fn reserve(&self, rsvp: abi::Reservation) -> Result<abi::Reservation, ReservationError> {
-        if rsvp.start.is_none() || rsvp.end.is_none() {
-            return Err(ReservationError::InvalidTime);
-        }
+        rsvp.validate()?;
 
         let mut return_rsvp = rsvp.clone();
 
-        let start =
-            convert_to_utc_time(rsvp.start.unwrap()).ok_or(ReservationError::InvalidTime)?;
-        let end = convert_to_utc_time(rsvp.end.unwrap()).ok_or(ReservationError::InvalidTime)?;
-
-        let timespan: PgRange<DateTime<Utc>> = (start..end).into();
+        let timespan: PgRange<DateTime<Utc>> = rsvp.get_timespan().into();
 
         let status = ReservationStatus::try_from(rsvp.status).unwrap_or(ReservationStatus::Pending);
 
@@ -92,27 +86,20 @@ impl ReservationManager {
 #[cfg(test)]
 mod tests {
 
-    use abi::convert_to_timestamp;
-    use sqlx::types::chrono::FixedOffset;
+    use abi::Reservation;
 
     use super::*;
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
     async fn reserve_should_work_for_valid_window() {
         let manager = ReservationManager::new(migrated_pool);
 
-        let start: DateTime<FixedOffset> = "2024-01-01T00:00:00-0700".parse().unwrap();
-        let end: DateTime<FixedOffset> = "2024-01-03T00:00:00-0700".parse().unwrap();
-
-        let rsvp = abi::Reservation {
-            id: "".to_string(),
-            user_id: "user".to_string(),
-            resource_id: "resource".to_string(),
-            start: Some(convert_to_timestamp(start.with_timezone(&Utc))),
-            end: Some(convert_to_timestamp(end.with_timezone(&Utc))),
-            note: "I'll arrive at 3pm, Please help to upgrade to executive room if possible."
-                .to_string(),
-            status: abi::ReservationStatus::Pending as i32,
-        };
+        let rsvp = Reservation::new_pending(
+            "user",
+            "resource",
+            "2024-01-01T00:00:00-0700".parse().unwrap(),
+            "2024-01-03T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
 
         let rsvp = manager.reserve(rsvp).await.unwrap();
 
