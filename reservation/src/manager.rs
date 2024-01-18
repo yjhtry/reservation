@@ -86,16 +86,16 @@ impl ReservationManager {
 #[cfg(test)]
 mod tests {
 
+    use super::*;
     use abi::Reservation;
 
-    use super::*;
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
     async fn reserve_should_work_for_valid_window() {
         let manager = ReservationManager::new(migrated_pool);
 
         let rsvp = Reservation::new_pending(
-            "user",
-            "resource",
+            "john",
+            "resource_id",
             "2024-01-01T00:00:00-0700".parse().unwrap(),
             "2024-01-03T00:00:00-0700".parse().unwrap(),
             "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
@@ -104,5 +104,31 @@ mod tests {
         let rsvp = manager.reserve(rsvp).await.unwrap();
 
         assert!(!rsvp.id.is_empty());
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn reserve_conflict_reservation_should_reject() {
+        let manager = ReservationManager::new(migrated_pool);
+
+        let rsvp1 = Reservation::new_pending(
+            "john",
+            "resource_id",
+            "2024-01-01T00:00:00-0700".parse().unwrap(),
+            "2024-01-03T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
+
+        let rsvp2 = Reservation::new_pending(
+            "lei",
+            "resource_id",
+            "2024-01-02T00:00:00-0700".parse().unwrap(),
+            "2024-01-04T00:00:00-0700".parse().unwrap(),
+            "Hello, I'm Lei, Please help to upgrade to executive room if possible.",
+        );
+
+        let _rsvp1 = manager.reserve(rsvp1).await.unwrap();
+        let err = manager.reserve(rsvp2).await.unwrap_err();
+
+        println!("err: {:?}", err);
     }
 }
