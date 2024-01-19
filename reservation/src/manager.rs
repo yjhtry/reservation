@@ -9,11 +9,11 @@ use sqlx::{
     PgPool, Row,
 };
 
-use crate::{ReservationError, ReservationId, ReservationManager, Rsvp};
+use crate::{Error, ReservationId, ReservationManager, Rsvp};
 
 #[async_trait]
 impl Rsvp for ReservationManager {
-    async fn reserve(&self, rsvp: abi::Reservation) -> Result<abi::Reservation, ReservationError> {
+    async fn reserve(&self, rsvp: abi::Reservation) -> Result<abi::Reservation, Error> {
         rsvp.validate()?;
 
         let mut return_rsvp = rsvp.clone();
@@ -25,8 +25,8 @@ impl Rsvp for ReservationManager {
         println!("status: {:?}", rsvp.status.to_string());
 
         let id: Uuid = sqlx::query(
-            "INSERT INTO rsvp.reservation (user_id, resource_id, timespan, note, status)
-            VALUES ($1, $2, $3, $4, $5::rsvp.reservation_status)
+            "INSERT INTO rsvp.reservations (user_id, resource_id, timespan, note, status)
+            VALUES ($1, $2, $3, $4, $5::rsvp.reservations_status)
             RETURNING id",
         )
         .bind(rsvp.user_id)
@@ -46,7 +46,7 @@ impl Rsvp for ReservationManager {
     async fn change_status(
         &self,
         _reservation_id: ReservationId,
-    ) -> Result<abi::Reservation, ReservationError> {
+    ) -> Result<abi::Reservation, Error> {
         todo!()
     }
 
@@ -54,25 +54,19 @@ impl Rsvp for ReservationManager {
         &self,
         _reservation_id: ReservationId,
         _note: String,
-    ) -> Result<abi::Reservation, ReservationError> {
+    ) -> Result<abi::Reservation, Error> {
         todo!()
     }
 
-    async fn delete(&self, _reservation_id: ReservationId) -> Result<(), ReservationError> {
+    async fn delete(&self, _reservation_id: ReservationId) -> Result<(), Error> {
         todo!()
     }
 
-    async fn get(
-        &self,
-        _reservation_id: ReservationId,
-    ) -> Result<abi::Reservation, ReservationError> {
+    async fn get(&self, _reservation_id: ReservationId) -> Result<abi::Reservation, Error> {
         todo!()
     }
 
-    async fn query(
-        &self,
-        _query: abi::ReservationQuery,
-    ) -> Result<Vec<abi::Reservation>, ReservationError> {
+    async fn query(&self, _query: abi::ReservationQuery) -> Result<Vec<abi::Reservation>, Error> {
         todo!()
     }
 }
@@ -130,5 +124,7 @@ mod tests {
         let err = manager.reserve(rsvp2).await.unwrap_err();
 
         println!("err: {:?}", err);
+
+        assert!(matches!(err, Error::ConflictReservation(_)));
     }
 }

@@ -1,3 +1,3 @@
-DROP TABLE rsvp.reservation_change  CASCADE;
-DROP TRIGGER reservation_trigger on rsvp.reservation;
-DROP FUNCTION rsvp.reservation_trigger;
+DROP TABLE rsvp.reservations_change  CASCADE;
+DROP TRIGGER reservation_trigger on rsvp.reservations;
+DROP FUNCTION rsvp.reservations_trigger;

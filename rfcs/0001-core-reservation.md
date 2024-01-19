@@ -156,25 +156,25 @@ We would use postgres as the database. Below is the schema:
 
 ```sql
 CREATE SCHEMA rsvp;
-CREATE TYPE rsvp.reservation_status AS ENUM (
+CREATE TYPE rsvp.reservations_status AS ENUM (
   'unknown',
   'pending',
   'confirmed',
   'blocked'
 );
 
-CREATE TYPE rsvp.reservation_update_type AS ENUM (
+CREATE TYPE rsvp.reservations_update_type AS ENUM (
   'unknown',
   'create',
   'update',
   'delete'
 );
 
-CREATE TABLE rsvp.reservation (
+CREATE TABLE rsvp.reservations (
   id UUID NOT NULL DEFAULT gen_random_uuid(),
   resource_id varchar(64 ) NOT NULL,
   user_id varchar(64) NOT NULL,
-  status rsvp.reservation_status NOT NULL DEFAULT 'pending',
+  status rsvp.reservations_status NOT NULL DEFAULT 'pending',
   timespan tstzrange NOT NULL,
   note text,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -184,8 +184,8 @@ CREATE TABLE rsvp.reservation (
   CONSTRAINT reservations_conflict EXCLUDE USING gist (resource_id WITH =, timespan WITH &&)
 );
 
-CREATE INDEX reservation_resource_id_idx ON rsvp.reservation (resource_id);
-CREATE INDEX reservation_user_id_idx ON rsvp.reservation (user_id);
+CREATE INDEX reservation_resource_id_idx ON rsvp.reservations (resource_id);
+CREATE INDEX reservation_user_id_idx ON rsvp.reservations (user_id);
 
 CREATE OR REPLACE FUNCTION rsvp.update_updated_at_column()
   RETURNS TRIGGER AS $$
@@ -195,54 +195,54 @@ CREATE OR REPLACE FUNCTION rsvp.update_updated_at_column()
   END;
 $$ LANGUAGE 'plpgsql';
 
-CREATE TRIGGER update_updated_at BEFORE UPDATE ON rsvp.reservation
+CREATE TRIGGER update_updated_at BEFORE UPDATE ON rsvp.reservations
 FOR EACH ROW EXECUTE PROCEDURE rsvp.update_updated_at_column();
 
-CREATE OR REPLACE FUNCTION rsvp.query(user_id varchar(64), resource_id varchar(64), during tstzrange) RETURNS TABLE (LIKE rsvp.reservation)
+CREATE OR REPLACE FUNCTION rsvp.query(user_id varchar(64), resource_id varchar(64), during tstzrange) RETURNS TABLE (LIKE rsvp.reservations)
 AS $$
 BEGIN
   -- if user_id is null, then return all reservations within the during
   IF user_id IS NULL THEN
       RETURN QUERY
-      SELECT * FROM rsvp.reservation WHERE rsvp.resource_id = resource_id AND during @> rsvp.reservation.timespan;
+      SELECT * FROM rsvp.reservations WHERE rsvp.resource_id = resource_id AND during @> rsvp.reservations.timespan;
   -- if resource_id is null, then return all reservations within the during
   ELSIF resource_id IS NULL THEN
       RETURN QUERY
-      SELECT * FROM rsvp.reservation WHERE rsvp.user_id = user_id AND during @> rsvp.reservation.timespan;
+      SELECT * FROM rsvp.reservations WHERE rsvp.user_id = user_id AND during @> rsvp.reservations.timespan;
   -- if both are null, then return all reservations within the during
   ELSIF user_id IS NULL AND resource_id IS NULL THEN
       RETURN QUERY
-      SELECT * FROM rsvp.reservation WHERE during @> rsvp.reservation.timespan;
+      SELECT * FROM rsvp.reservations WHERE during @> rsvp.reservations.timespan;
   -- if both set, then return all reservations within the during for the resource and user
   ELSE
       RETURN QUERY
-      SELECT * FROM rsvp.reservation
-        WHERE rsvp.reservation.user_id = user_id
-            AND rsvp.reservation.resource_id = resource_id
-            AND during @> rsvp.reservation.timespan;
+      SELECT * FROM rsvp.reservations
+        WHERE rsvp.reservations.user_id = user_id
+            AND rsvp.reservations.resource_id = resource_id
+            AND during @> rsvp.reservations.timespan;
   END IF;
 END;
 $$ LANGUAGE plpgsql;
 
 
 -- reservation change queue
-CREATE TABLE rsvp.reservation_change (
+CREATE TABLE rsvp.reservations_change (
   id SERIAL NOT NULL,
   reservation_id varchar(64) NOT NULL,
-  op rsvp.reservation_update_type NOT NULL,
+  op rsvp.reservations_update_type NOT NULL,
 );
 
 -- trigger for add/update/delete reservation
-CREATE OR REPLACE FUNCTION rsvp.reservation_trigger() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION rsvp.reservations_trigger() RETURNS TRIGGER AS $$
 BEGIN
   IF (TG_OP = 'INSERT') THEN
-    INSERT INTO rsvp.reservation_change (reservation_id, op) VALUES (NEW.id, 'create');
+    INSERT INTO rsvp.reservations_change (reservation_id, op) VALUES (NEW.id, 'create');
   ELSIF (TG_OP = 'UPDATE') THEN
     IF (OLD.status <> NEW.status) THEN
-      INSERT INTO rsvp.reservation_change (reservation_id, op) VALUES (NEW.id, 'update');
+      INSERT INTO rsvp.reservations_change (reservation_id, op) VALUES (NEW.id, 'update');
     END IF;
   ELSIF (TG_OP = 'DELETE') THEN
-    INSERT INTO rsvp.reservation_change (reservation_id, op) VALUES (OLD.id, 'delete');
+    INSERT INTO rsvp.reservations_change (reservation_id, op) VALUES (OLD.id, 'delete');
   END IF;
   -- notify a channel called reservation_update
   NOTIFY reservation_update;
@@ -250,8 +250,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER reservation_trigger AFTER INSERT OR UPDATE OR DELETE ON rsvp.reservation
-FOR EACH ROW EXECUTE PROCEDURE rsvp.reservation_trigger();
+CREATE TRIGGER reservation_trigger AFTER INSERT OR UPDATE OR DELETE ON rsvp.reservations
+FOR EACH ROW EXECUTE PROCEDURE rsvp.reservations_trigger();
 ```
 
 Here we use EXCLUDE constraint provide by postgres to ensure that verlapping reservations cannot be made for a given resource at a given time.
