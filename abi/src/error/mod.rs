@@ -1,5 +1,9 @@
+mod conflict;
+
 use sqlx::postgres::PgDatabaseError;
 use thiserror::Error;
+
+use self::conflict::ReservationConflictInfo;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -9,8 +13,8 @@ pub enum Error {
     #[error("Database error")]
     DbError(sqlx::Error),
 
-    #[error("ConflictError: {0}")]
-    ConflictReservation(String),
+    #[error("Conflict reservation")]
+    ConflictReservation(ReservationConflictInfo),
 
     #[error("No reservation found by the given condition")]
     NotFound,
