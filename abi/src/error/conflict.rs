@@ -1,5 +1,3 @@
-#![allow(clippy::all, dead_code)]
-
 use std::{convert::Infallible, str::FromStr};
 
 use chrono::{DateTime, Utc};
@@ -15,9 +13,9 @@ pub enum ReservationConflictInfo {
 
 #[derive(Debug, Clone, Default)]
 pub struct ReservationWindow {
-    rid: String,
-    start: DateTime<Utc>,
-    end: DateTime<Utc>,
+    pub rid: String,
+    pub start: DateTime<Utc>,
+    pub end: DateTime<Utc>,
 }
 
 impl ReservationWindow {
@@ -39,13 +37,9 @@ impl FromStr for ReservationWindow {
             let split = caps["old"].splitn(2, ',').collect::<Vec<_>>();
 
             let rid = split[0].trim().to_string();
-            let timespan = split[1]
-                .trim()
-                .to_string()
-                .replace("[", "")
-                .replace("\"", "");
+            let timespan = split[1].trim().to_string().replace(['[', '"'], "");
 
-            let timespan = timespan.splitn(2, ",").collect::<Vec<_>>();
+            let timespan = timespan.splitn(2, ',').collect::<Vec<_>>();
             let start = timespan[0].trim().to_string();
             let end = timespan[1].trim().to_string();
 
@@ -55,9 +49,7 @@ impl FromStr for ReservationWindow {
                 convert_to_utc_time(Timestamp::from_str(&end).unwrap()).unwrap(),
             ))
         } else {
-            println!("{}", s);
-            println!("no match");
-            return Err(s.to_string());
+            Err(s.to_string())
         }
     }
 }

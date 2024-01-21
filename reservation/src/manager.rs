@@ -82,6 +82,7 @@ mod tests {
 
     use super::*;
     use abi::Reservation;
+    use abi::ReservationConflictInfo;
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
     async fn reserve_should_work_for_valid_window() {
@@ -106,7 +107,7 @@ mod tests {
 
         let rsvp1 = Reservation::new_pending(
             "john",
-            "resource_id",
+            "resource_id_a",
             "2024-01-01T00:00:00-0700".parse().unwrap(),
             "2024-01-03T00:00:00-0700".parse().unwrap(),
             "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
@@ -114,7 +115,7 @@ mod tests {
 
         let rsvp2 = Reservation::new_pending(
             "lei",
-            "resource_id",
+            "resource_id_a",
             "2024-01-02T00:00:00-0700".parse().unwrap(),
             "2024-01-04T00:00:00-0700".parse().unwrap(),
             "Hello, I'm Lei, Please help to upgrade to executive room if possible.",
@@ -123,8 +124,12 @@ mod tests {
         let _rsvp1 = manager.reserve(rsvp1).await.unwrap();
         let err = manager.reserve(rsvp2).await.unwrap_err();
 
-        println!("err: {:?}", err);
-
-        assert!(matches!(err, Error::ConflictReservation(_)));
+        if let abi::Error::ConflictReservation(ReservationConflictInfo::Parsed(info)) = err {
+            assert_eq!(info.rid, "resource_id_a");
+            assert_eq!(info.start.to_rfc3339(), "2024-01-01T07:00:00+00:00");
+            assert_eq!(info.end.to_rfc3339(), "2024-01-03T07:00:00+00:00");
+        } else {
+            panic!("expect conflict reservation error");
+        }
     }
 }
