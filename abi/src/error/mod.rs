@@ -25,6 +25,9 @@ pub enum Error {
     #[error("Invalid user id: {0}")]
     InvalidUserId(String),
 
+    #[error("Invalid reservation id: {0}")]
+    InvalidReservationId(String),
+
     #[error("Invalid user id: {0}")]
     InvalidResourceId(String),
 }

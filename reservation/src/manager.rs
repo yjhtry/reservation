@@ -43,11 +43,20 @@ impl Rsvp for ReservationManager {
         Ok(return_rsvp)
     }
 
-    async fn change_status(
-        &self,
-        _reservation_id: ReservationId,
-    ) -> Result<abi::Reservation, Error> {
-        todo!()
+    async fn change_status(&self, id: ReservationId) -> Result<abi::Reservation, Error> {
+        let id = Uuid::parse_str(&id).map_err(|e| Error::InvalidReservationId(e.to_string()))?;
+        // if current status is pending, change is to confirmed, otherwise do nothing
+        let rsvp: abi::Reservation = sqlx::query_as(
+            "UPDATE rsvp.reservations
+            SET status = 'confirmed'::rsvp.reservations_status
+            WHERE id = $1 AND status = 'pending'::rsvp.reservations_status
+            RETURNING *",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(rsvp)
     }
 
     async fn update_note(
@@ -90,7 +99,7 @@ mod tests {
 
         let rsvp = Reservation::new_pending(
             "john",
-            "resource_id",
+            "ocean_view_room_1",
             "2024-01-01T00:00:00-0700".parse().unwrap(),
             "2024-01-03T00:00:00-0700".parse().unwrap(),
             "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
@@ -107,7 +116,7 @@ mod tests {
 
         let rsvp1 = Reservation::new_pending(
             "john",
-            "resource_id_a",
+            "ocean_view_room_2",
             "2024-01-01T00:00:00-0700".parse().unwrap(),
             "2024-01-03T00:00:00-0700".parse().unwrap(),
             "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
@@ -115,21 +124,38 @@ mod tests {
 
         let rsvp2 = Reservation::new_pending(
             "lei",
-            "resource_id_a",
+            "ocean_view_room_2",
             "2024-01-02T00:00:00-0700".parse().unwrap(),
             "2024-01-04T00:00:00-0700".parse().unwrap(),
             "Hello, I'm Lei, Please help to upgrade to executive room if possible.",
         );
 
-        let _rsvp1 = manager.reserve(rsvp1).await.unwrap();
+        let _ = manager.reserve(rsvp1).await.unwrap();
         let err = manager.reserve(rsvp2).await.unwrap_err();
 
         if let abi::Error::ConflictReservation(ReservationConflictInfo::Parsed(info)) = err {
-            assert_eq!(info.rid, "resource_id_a");
+            assert_eq!(info.rid, "ocean_view_room_2");
             assert_eq!(info.start.to_rfc3339(), "2024-01-01T07:00:00+00:00");
             assert_eq!(info.end.to_rfc3339(), "2024-01-03T07:00:00+00:00");
         } else {
             panic!("expect conflict reservation error");
         }
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn change_reservation_should_work() {
+        let manager = ReservationManager::new(migrated_pool);
+        let rsvp = Reservation::new_pending(
+            "john",
+            "ocean_view_room_3",
+            "2024-01-01T00:00:00-0700".parse().unwrap(),
+            "2024-01-03T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
+
+        let rsvp = manager.reserve(rsvp).await.unwrap();
+        let rsvp = manager.change_status(rsvp.id.clone()).await.unwrap();
+
+        assert_eq!(rsvp.status, ReservationStatus::Confirmed as i32);
     }
 }

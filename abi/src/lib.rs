@@ -7,3 +7,14 @@ pub use error::*;
 pub use pb::*;
 pub use types::*;
 pub use utils::*;
+
+impl From<RsvpStatus> for ReservationStatus {
+    fn from(status: RsvpStatus) -> Self {
+        match status {
+            RsvpStatus::Unknown => Self::Unknown,
+            RsvpStatus::Pending => Self::Pending,
+            RsvpStatus::Confirmed => Self::Confirmed,
+            RsvpStatus::Blocked => Self::Blocked,
+        }
+    }
+}
