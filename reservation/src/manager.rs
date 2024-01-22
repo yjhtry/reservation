@@ -45,6 +45,7 @@ impl Rsvp for ReservationManager {
 
     async fn change_status(&self, id: ReservationId) -> Result<abi::Reservation, Error> {
         let id = Uuid::parse_str(&id).map_err(|e| Error::InvalidReservationId(e.to_string()))?;
+
         // if current status is pending, change is to confirmed, otherwise do nothing
         let rsvp: abi::Reservation = sqlx::query_as(
             "UPDATE rsvp.reservations
@@ -61,18 +62,54 @@ impl Rsvp for ReservationManager {
 
     async fn update_note(
         &self,
-        _reservation_id: ReservationId,
-        _note: String,
+        id: ReservationId,
+        note: String,
     ) -> Result<abi::Reservation, Error> {
-        todo!()
+        let id = Uuid::parse_str(&id).map_err(|e| Error::InvalidReservationId(e.to_string()))?;
+
+        // change note for the reservation
+        let rsvp: abi::Reservation = sqlx::query_as(
+            "UPDATE rsvp.reservations
+            SET note = $2
+            WHERE id = $1
+            RETURNING *",
+        )
+        .bind(id)
+        .bind(note)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(rsvp)
     }
 
-    async fn delete(&self, _reservation_id: ReservationId) -> Result<(), Error> {
-        todo!()
+    async fn delete(&self, id: ReservationId) -> Result<(), Error> {
+        // delete reservation by id
+
+        let id = Uuid::parse_str(&id).map_err(|e| Error::InvalidReservationId(e.to_string()))?;
+
+        let _ = sqlx::query("DELETE FROM rsvp.reservations WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 
-    async fn get(&self, _reservation_id: ReservationId) -> Result<abi::Reservation, Error> {
-        todo!()
+    async fn get(&self, id: ReservationId) -> Result<abi::Reservation, Error> {
+        // get reservation by id
+
+        let id = Uuid::parse_str(&id).map_err(|e| Error::InvalidReservationId(e.to_string()))?;
+
+        let rsvp: abi::Reservation = sqlx::query_as(
+            "SELECT id, user_id, resource_id, timespan, note, status
+            FROM rsvp.reservations
+            WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(rsvp)
     }
 
     async fn query(&self, _query: abi::ReservationQuery) -> Result<Vec<abi::Reservation>, Error> {
@@ -92,6 +129,7 @@ mod tests {
     use super::*;
     use abi::Reservation;
     use abi::ReservationConflictInfo;
+    use abi::ReservationWindow;
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
     async fn reserve_should_work_for_valid_window() {
@@ -133,17 +171,18 @@ mod tests {
         let _ = manager.reserve(rsvp1).await.unwrap();
         let err = manager.reserve(rsvp2).await.unwrap_err();
 
-        if let abi::Error::ConflictReservation(ReservationConflictInfo::Parsed(info)) = err {
-            assert_eq!(info.rid, "ocean_view_room_2");
-            assert_eq!(info.start.to_rfc3339(), "2024-01-01T07:00:00+00:00");
-            assert_eq!(info.end.to_rfc3339(), "2024-01-03T07:00:00+00:00");
-        } else {
-            panic!("expect conflict reservation error");
-        }
+        let info =
+            Error::ConflictReservation(ReservationConflictInfo::Parsed(ReservationWindow::new(
+                "ocean_view_room_2".to_string(),
+                "2024-01-01T07:00:00+00:00".parse().unwrap(),
+                "2024-01-03T07:00:00+00:00".parse().unwrap(),
+            )));
+
+        assert_eq!(err, info);
     }
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
-    async fn change_reservation_should_work() {
+    async fn change_reservation_status_should_work() {
         let manager = ReservationManager::new(migrated_pool);
         let rsvp = Reservation::new_pending(
             "john",
@@ -157,5 +196,77 @@ mod tests {
         let rsvp = manager.change_status(rsvp.id.clone()).await.unwrap();
 
         assert_eq!(rsvp.status, ReservationStatus::Confirmed as i32);
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn change_reservation_not_pending_should_nothing() {
+        let manager = ReservationManager::new(migrated_pool);
+        let rsvp = Reservation::new_pending(
+            "john",
+            "ocean_view_room_3",
+            "2024-01-01T00:00:00-0700".parse().unwrap(),
+            "2024-01-03T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
+
+        let rsvp = manager.reserve(rsvp).await.unwrap();
+        let rsvp = manager.change_status(rsvp.id.clone()).await.unwrap();
+        let rsvp = manager.change_status(rsvp.id.clone()).await.unwrap_err();
+
+        assert_eq!(rsvp, Error::NotFound);
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn update_note_should_work() {
+        let manager = ReservationManager::new(migrated_pool);
+        let rsvp = Reservation::new_pending(
+            "john",
+            "ocean_view_room_3",
+            "2024-01-01T00:00:00-0700".parse().unwrap(),
+            "2024-01-03T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
+
+        let note = "new note".to_string();
+
+        let rsvp = manager.reserve(rsvp).await.unwrap();
+        let rsvp = manager
+            .update_note(rsvp.id.clone(), note.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(rsvp.note, note);
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn delete_reservation_by_id_should_work() {
+        let manager = ReservationManager::new(migrated_pool);
+        let rsvp = Reservation::new_pending(
+            "john",
+            "ocean_view_room_3",
+            "2024-01-01T00:00:00-0700".parse().unwrap(),
+            "2024-01-03T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
+
+        let rsvp = manager.reserve(rsvp).await.unwrap();
+        manager.delete(rsvp.id.clone()).await.unwrap();
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn get_reservation_by_id_should_work() {
+        let manager = ReservationManager::new(migrated_pool);
+        let insert = Reservation::new_pending(
+            "john",
+            "ocean_view_room_3",
+            "2024-01-01T00:00:00-0700".parse().unwrap(),
+            "2024-01-03T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
+
+        let rsvp = manager.reserve(insert).await.unwrap();
+        let insert = manager.get(rsvp.id.clone()).await.unwrap();
+
+        assert_eq!(insert, rsvp);
     }
 }

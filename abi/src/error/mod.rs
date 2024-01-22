@@ -32,6 +32,22 @@ pub enum Error {
     InvalidResourceId(String),
 }
 
+impl PartialEq for Error {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Unknown, Self::Unknown) => true,
+            (Self::DbError(_), Self::DbError(_)) => true,
+            (Self::ConflictReservation(v1), Self::ConflictReservation(v2)) => v1 == v2,
+            (Self::NotFound, Self::NotFound) => true,
+            (Self::InvalidTime, Self::InvalidTime) => true,
+            (Self::InvalidUserId(v1), Self::InvalidUserId(v2)) => v1 == v2,
+            (Self::InvalidReservationId(v1), Self::InvalidReservationId(v2)) => v1 == v2,
+            (Self::InvalidResourceId(v1), Self::InvalidResourceId(v2)) => v1 == v2,
+            _ => false,
+        }
+    }
+}
+
 impl From<sqlx::Error> for Error {
     fn from(e: sqlx::Error) -> Self {
         match e {

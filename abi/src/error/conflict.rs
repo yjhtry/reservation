@@ -5,13 +5,13 @@ use prost_types::Timestamp;
 
 use crate::convert_to_utc_time;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReservationConflictInfo {
     Parsed(ReservationWindow),
     Unparsed(String),
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReservationWindow {
     pub rid: String,
     pub start: DateTime<Utc>,
