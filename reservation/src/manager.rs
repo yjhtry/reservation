@@ -251,6 +251,10 @@ mod tests {
 
         let rsvp = manager.reserve(rsvp).await.unwrap();
         manager.delete(rsvp.id.clone()).await.unwrap();
+
+        let rsvp = manager.get(rsvp.id.clone()).await.unwrap_err();
+
+        assert_eq!(rsvp, Error::NotFound);
     }
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
