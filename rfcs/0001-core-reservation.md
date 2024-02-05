@@ -125,6 +125,13 @@ message QueryRequest {
   ReservationStatus status = 3;
   google.protobuf.Timestamp start = 4;
   google.protobuf.Timestamp end = 5;
+
+  // current page
+  int32 page = 6;
+  // page size
+  int32 page_size = 7;
+  // order by
+  bool is_desc = 8;
 }
 
 // listen reservation updates request data

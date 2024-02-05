@@ -38,7 +38,7 @@ The section should return to the examples given in the previous section, and exp
 
 Why should we *not* do this?
 
-# Rationale and alternatives
+## Rationale and alternatives
 
 - Why is this design the best in the space of possible designs?
 - What other designs have been considered and what is the rationale for not choosing them?
