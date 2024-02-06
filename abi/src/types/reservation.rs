@@ -3,10 +3,26 @@ use sqlx::postgres::types::PgRange;
 use sqlx::types::Uuid;
 use sqlx::Row;
 use sqlx::{postgres::PgRow, FromRow};
-use std::ops::{Bound, Range};
+use std::ops::Bound;
 
-use crate::{convert_to_timestamp, convert_to_utc_time};
+use crate::{convert_to_timestamp, get_timespan, validate_range, Validator};
 use crate::{Error, Reservation, ReservationStatus};
+
+impl Validator for Reservation {
+    fn validate(&self) -> Result<(), Error> {
+        if self.user_id.is_empty() {
+            return Err(Error::InvalidUserId(self.user_id.clone()));
+        }
+
+        if self.resource_id.is_empty() {
+            return Err(Error::InvalidResourceId(self.resource_id.clone()));
+        }
+
+        validate_range(self.start.as_ref(), self.end.as_ref())?;
+
+        Ok(())
+    }
+}
 
 impl Reservation {
     pub fn new_pending(
@@ -27,38 +43,10 @@ impl Reservation {
         }
     }
 
-    pub fn get_timespan(&self) -> Range<DateTime<Utc>> {
-        let start = convert_to_utc_time(self.start.clone().unwrap()).unwrap();
-        let end = convert_to_utc_time(self.end.clone().unwrap()).unwrap();
-
-        start..end
-    }
-
-    pub fn validate(&self) -> Result<(), Error> {
-        if self.user_id.is_empty() {
-            return Err(Error::InvalidUserId(self.user_id.clone()));
-        }
-
-        if self.resource_id.is_empty() {
-            return Err(Error::InvalidResourceId(self.resource_id.clone()));
-        }
-
-        if self.start.is_none() || self.end.is_none() {
-            return Err(Error::InvalidTime);
-        }
-
-        let start = convert_to_utc_time(self.start.clone().unwrap()).ok_or(Error::InvalidTime)?;
-        let end = convert_to_utc_time(self.end.clone().unwrap()).ok_or(Error::InvalidTime)?;
-
-        if start > end {
-            return Err(Error::InvalidTime);
-        }
-
-        Ok(())
+    pub fn get_timespan(&self) -> PgRange<DateTime<Utc>> {
+        get_timespan(self.start.as_ref(), self.end.as_ref())
     }
 }
-
-// impl sqxl::FromRow for Reservation
 
 struct NativeRange<T> {
     start: Option<T>,

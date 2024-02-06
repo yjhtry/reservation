@@ -1,13 +1,6 @@
-use abi::ReservationStatus;
+use abi::{ReservationStatus, Validator};
 use async_trait::async_trait;
-use sqlx::{
-    postgres::types::PgRange,
-    types::{
-        chrono::{DateTime, Utc},
-        Uuid,
-    },
-    PgPool, Row,
-};
+use sqlx::{types::Uuid, PgPool, Row};
 
 use crate::{Error, ReservationId, ReservationManager, Rsvp};
 
@@ -18,11 +11,9 @@ impl Rsvp for ReservationManager {
 
         let mut return_rsvp = rsvp.clone();
 
-        let timespan: PgRange<DateTime<Utc>> = rsvp.get_timespan().into();
+        let timespan = rsvp.get_timespan();
 
         let status = ReservationStatus::try_from(rsvp.status).unwrap_or(ReservationStatus::Pending);
-
-        println!("status: {:?}", rsvp.status.to_string());
 
         let id: Uuid = sqlx::query(
             "INSERT INTO rsvp.reservations (user_id, resource_id, timespan, note, status)
@@ -112,15 +103,33 @@ impl Rsvp for ReservationManager {
         Ok(rsvp)
     }
 
-    async fn query(&self, _query: abi::ReservationQuery) -> Result<Vec<abi::Reservation>, Error> {
-        // let rsvps: Vec<abi::Reservation> =
-        //     sqlx::query_as("rsvp.query($1, $2, $3, $4, $5, $6, $7, $8)")
-        //         .bind(query.user_id)
-        //         .bind(query.resource_id)
-        //         .fetch_all(&self.pool)
-        //         .await?;
+    async fn query(&self, query: abi::ReservationQuery) -> Result<Vec<abi::Reservation>, Error> {
+        let timespan = query.get_timespan();
+        let status =
+            ReservationStatus::try_from(query.status).unwrap_or(ReservationStatus::Pending);
 
-        todo!()
+        let rsvps: Vec<abi::Reservation> = sqlx::query_as(
+            "SELECT * FROM rsvp.query($1, $2, $3, $4::rsvp.reservation_status, $5, $6, $7)",
+        )
+        .bind(str_to_option(&query.user_id))
+        .bind(str_to_option(&query.resource_id))
+        .bind(timespan)
+        .bind(status.to_string())
+        .bind(query.is_desc)
+        .bind(query.page)
+        .bind(query.page_size)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rsvps)
+    }
+}
+
+fn str_to_option(s: &str) -> Option<String> {
+    if s.is_empty() {
+        None
+    } else {
+        Some(s.to_string())
     }
 }
 
@@ -136,6 +145,7 @@ mod tests {
     use super::*;
     use abi::Reservation;
     use abi::ReservationConflictInfo;
+    use abi::ReservationQueryParams;
     use abi::ReservationWindow;
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
@@ -279,5 +289,46 @@ mod tests {
         let insert = manager.get(rsvp.id.clone()).await.unwrap();
 
         assert_eq!(insert, rsvp);
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn query_reservation_should_work() {
+        let manager = ReservationManager::new(migrated_pool);
+        let insert = Reservation::new_pending(
+            "john",
+            "ocean_view_room_3",
+            "2024-01-01T00:00:00-0700".parse().unwrap(),
+            "2024-01-03T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
+
+        let rsvp1 = manager.reserve(insert).await.unwrap();
+
+        let insert = Reservation::new_pending(
+            "john",
+            "ocean_view_room_3",
+            "2024-01-04T00:00:00-0700".parse().unwrap(),
+            "2024-01-06T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
+
+        let rsvp2 = manager.reserve(insert).await.unwrap();
+
+        let query = abi::ReservationQuery::new(ReservationQueryParams {
+            uid: "john".to_string(),
+            rid: "ocean_view_room_3".to_string(),
+            start: "2024-01-01T00:00:00-0700".parse().unwrap(),
+            end: "2024-01-09T00:00:00-0700".parse().unwrap(),
+            status: ReservationStatus::Pending,
+            page: 1,
+            page_size: 10,
+            is_desc: false,
+        });
+
+        let rsvps = manager.query(query).await.unwrap();
+
+        assert_eq!(rsvps.len(), 2);
+        assert_eq!(rsvp1, rsvps[0]);
+        assert_eq!(rsvp2, rsvps[1]);
     }
 }

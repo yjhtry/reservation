@@ -4,6 +4,7 @@
     "datetime",
     "nanos",
     "prost",
+    "rsvps",
     "sqlx",
     "subsec",
     "thiserror",

@@ -45,8 +45,8 @@ impl FromStr for ReservationWindow {
 
             Ok(ReservationWindow::new(
                 rid,
-                convert_to_utc_time(Timestamp::from_str(&start).unwrap()).unwrap(),
-                convert_to_utc_time(Timestamp::from_str(&end).unwrap()).unwrap(),
+                convert_to_utc_time(&Timestamp::from_str(&start).unwrap()),
+                convert_to_utc_time(&Timestamp::from_str(&end).unwrap()),
             ))
         } else {
             Err(s.to_string())

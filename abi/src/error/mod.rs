@@ -30,6 +30,9 @@ pub enum Error {
 
     #[error("Invalid user id: {0}")]
     InvalidResourceId(String),
+
+    #[error("Invalid status: {0}")]
+    InvalidStatus(i32),
 }
 
 impl PartialEq for Error {

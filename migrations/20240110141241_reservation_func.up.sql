@@ -3,8 +3,8 @@ CREATE OR REPLACE FUNCTION rsvp.query(
     rid varchar(64),
     during TSTZRANGE,
     status rsvp.reservation_status DEFAULT 'pending',
-    page integer DEFAULT 1,
     is_desc boolean DEFAULT false,
+    page integer DEFAULT 1,
     page_size integer DEFAULT 10
 ) RETURNS TABLE (LIKE rsvp.reservations)
 AS $$
@@ -19,7 +19,7 @@ BEGIN
          status,
         CASE
             WHEN rid IS NOT NULL AND uid IS NOT NULL THEN
-                'user_id = ' || quote_literal(rid) || 'AND resource_id =' || quote_literal(uid)
+                'user_id = ' || quote_literal(uid) || 'AND resource_id =' || quote_literal(rid)
             WHEN uid IS NOT NULL THEN
                 'user_id = ' || quote_literal(uid)
             WHEN rid IS NOT NULL THEN
