@@ -12,7 +12,7 @@ fn main() {
             &["reservation.ReservationQuery"],
             &[
                 "#[derive(derive_builder::Builder)]",
-                "#[builder(setter(into))]",
+                "#[builder(setter(into), default)]",
             ],
         )
         .fields_attributes(
@@ -66,5 +66,56 @@ impl BuilderExt for tonic_build::Builder {
                 acc.field_attribute(format!("{}.{}", path, field), attribute)
             })
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_types_attributes() {
+        let builder = tonic_build::configure().types_attributes(
+            &["reservation.ReservationQuery"],
+            &[
+                "#[derive(derive_builder::Builder)]",
+                "#[builder(setter(into), default)]",
+            ],
+        );
+
+        assert_eq!(
+            builder,
+            tonic_build::configure()
+                .type_attribute(
+                    "reservation.ReservationQuery",
+                    "#[derive(derive_builder::Builder)]"
+                )
+                .type_attribute(
+                    "reservation.ReservationQuery",
+                    "#[builder(setter(into), default)]"
+                )
+        );
+    }
+
+    #[test]
+    fn test_fields_attributes() {
+        let builder = tonic_build::configure().fields_attributes(
+            "reservation.ReservationQuery",
+            &["start", "end"],
+            &["#[builder(setter(strip_option))]"],
+        );
+
+        assert_eq!(
+            builder,
+            tonic_build::configure()
+                .field_attribute(
+                    "reservation.ReservationQuery.start",
+                    "#[builder(setter(strip_option))]"
+                )
+                .field_attribute(
+                    "reservation.ReservationQuery.end",
+                    "#[builder(setter(strip_option))]"
+                )
+        );
     }
 }

@@ -302,21 +302,11 @@ mod tests {
             "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
         );
 
-        let rsvp1 = manager.reserve(insert).await.unwrap();
-
-        let insert = Reservation::new_pending(
-            "john",
-            "ocean_view_room_3",
-            "2024-01-04T00:00:00-0700".parse().unwrap(),
-            "2024-01-06T00:00:00-0700".parse().unwrap(),
-            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
-        );
-
-        let rsvp2 = manager.reserve(insert).await.unwrap();
+        let rsvp = manager.reserve(insert).await.unwrap();
 
         let query = abi::ReservationQueryBuilder::default()
             .user_id("john")
-            .resource_id("ocean_view_room_3")
+            // .resource_id("ocean_view_room_3")
             .start("2024-01-01T00:00:00-0700".parse::<Timestamp>().unwrap())
             .end("2024-01-09T00:00:00-0700".parse::<Timestamp>().unwrap())
             .build()
@@ -324,8 +314,41 @@ mod tests {
 
         let rsvps = manager.query(query).await.unwrap();
 
-        assert_eq!(rsvps.len(), 2);
-        assert_eq!(rsvp1, rsvps[0]);
-        assert_eq!(rsvp2, rsvps[1]);
+        assert_eq!(rsvps.len(), 1);
+        assert_eq!(rsvp, rsvps[0]);
+
+        // if the window is not match, should return empty
+        let query = abi::ReservationQueryBuilder::default()
+            .user_id("john")
+            .resource_id("ocean_view_room_3")
+            .start("2024-01-01T00:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2024-01-02T00:00:00-0700".parse::<Timestamp>().unwrap())
+            .build()
+            .unwrap();
+
+        let rsvps = manager.query(query).await.unwrap();
+
+        assert_eq!(rsvps.len(), 0);
+
+        // if the status is not match, should return empty
+        let query = abi::ReservationQueryBuilder::default()
+            .user_id("john")
+            .resource_id("ocean_view_room_3")
+            .start("2024-01-01T00:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2024-01-09T00:00:00-0700".parse::<Timestamp>().unwrap())
+            .status(ReservationStatus::Confirmed as i32)
+            .build()
+            .unwrap();
+
+        let rsvps = manager.query(query.clone()).await.unwrap();
+
+        assert_eq!(rsvps.len(), 0);
+
+        // change status to confirmed, should return the reservation
+        let rsvp = manager.change_status(rsvp.id.clone()).await.unwrap();
+        let rsvps = manager.query(query).await.unwrap();
+
+        assert_eq!(rsvps.len(), 1);
+        assert_eq!(rsvp, rsvps[0]);
     }
 }

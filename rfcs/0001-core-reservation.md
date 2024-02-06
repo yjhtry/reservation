@@ -218,6 +218,16 @@ AS $$
 DECLARE
     _sql TEXT;
 BEGIN
+    -- if page is less than 1, set it to 1
+    IF page < 1 THEN
+        page := 1;
+    END IF;
+
+    -- if page_size is less than 1 or more than 10000, set it to 1
+    IF page_size < 1 OR page_size > 10000 THEN
+        page_size := 1;
+    END IF;
+
     -- format the sql query based on the parameters
     _sql := format(
         'SELECT * FROM rsvp.reservations WHERE %L @> timespan AND status = %L::rsvp.reservation_status AND %s

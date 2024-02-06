@@ -46,6 +46,7 @@ impl PartialEq for Error {
             (Self::InvalidUserId(v1), Self::InvalidUserId(v2)) => v1 == v2,
             (Self::InvalidReservationId(v1), Self::InvalidReservationId(v2)) => v1 == v2,
             (Self::InvalidResourceId(v1), Self::InvalidResourceId(v2)) => v1 == v2,
+            (Self::InvalidStatus(v1), Self::InvalidStatus(v2)) => v1 == v2,
             _ => false,
         }
     }

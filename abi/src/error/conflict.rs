@@ -74,7 +74,7 @@ mod test {
     #[test]
     fn test_parse() {
         let s = r#"Key (resource_id, timespan)=(resource_id, ["2024-01-02 07:00:00+00", "2024-01-04 07:00:00+00")) conflicts with existing key (resource_id, timespan)=(resource_id, ["2024-01-01 07:00:00+00","2024-01-03 07:00:00+00"))"#;
-        let info = s.parse::<ReservationConflictInfo>().unwrap();
+        let info: ReservationConflictInfo = s.parse::<ReservationConflictInfo>().unwrap();
         assert!(matches!(info, ReservationConflictInfo::Parsed(_)));
     }
 }

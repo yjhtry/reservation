@@ -14,3 +14,34 @@ pub fn convert_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
         nanos: dt.timestamp_subsec_nanos() as _,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn convert_to_utc_time_should_resolve_correct_time() {
+        let ts = Timestamp {
+            seconds: 0,
+            nanos: 0,
+        };
+
+        assert_eq!(
+            convert_to_utc_time(&ts),
+            Utc.timestamp_opt(0, 0).single().unwrap()
+        );
+    }
+
+    #[test]
+    fn convert_to_timestamp_should_resolve_correct_time() {
+        let dt = Utc.timestamp_opt(0, 0).single().unwrap();
+
+        assert_eq!(
+            convert_to_timestamp(dt),
+            Timestamp {
+                seconds: 0,
+                nanos: 0
+            }
+        );
+    }
+}
