@@ -4,10 +4,13 @@
     "datetime",
     "nanos",
     "prost",
+    "protos",
+    "repr",
     "rsvps",
     "sqlx",
     "subsec",
     "thiserror",
-    "timespan"
+    "timespan",
+    "codegen"
   ]
 }

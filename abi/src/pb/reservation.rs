@@ -97,6 +97,8 @@ pub struct GetResponse {
     #[prost(message, optional, tag = "1")]
     pub reservation: ::core::option::Option<Reservation>,
 }
+#[derive(derive_builder::Builder)]
+#[builder(setter(into))]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ReservationQuery {
@@ -106,19 +108,25 @@ pub struct ReservationQuery {
     pub user_id: ::prost::alloc::string::String,
     /// use status to filter result, If UNKNOWN return all reservations
     #[prost(enumeration = "ReservationStatus", tag = "3")]
+    #[builder(default = "1")]
     pub status: i32,
     #[prost(message, optional, tag = "4")]
+    #[builder(setter(strip_option))]
     pub start: ::core::option::Option<::prost_types::Timestamp>,
     #[prost(message, optional, tag = "5")]
+    #[builder(setter(strip_option))]
     pub end: ::core::option::Option<::prost_types::Timestamp>,
     /// current page
     #[prost(int32, tag = "6")]
+    #[builder(default = "1")]
     pub page: i32,
     /// page size
     #[prost(int32, tag = "7")]
+    #[builder(default = "10")]
     pub page_size: i32,
     /// order by
     #[prost(bool, tag = "8")]
+    #[builder(default = "false")]
     pub is_desc: bool,
 }
 /// query reservation list request data

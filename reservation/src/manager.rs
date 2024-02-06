@@ -145,8 +145,8 @@ mod tests {
     use super::*;
     use abi::Reservation;
     use abi::ReservationConflictInfo;
-    use abi::ReservationQueryParams;
     use abi::ReservationWindow;
+    use prost_types::Timestamp;
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
     async fn reserve_should_work_for_valid_window() {
@@ -314,16 +314,13 @@ mod tests {
 
         let rsvp2 = manager.reserve(insert).await.unwrap();
 
-        let query = abi::ReservationQuery::new(ReservationQueryParams {
-            uid: "john".to_string(),
-            rid: "ocean_view_room_3".to_string(),
-            start: "2024-01-01T00:00:00-0700".parse().unwrap(),
-            end: "2024-01-09T00:00:00-0700".parse().unwrap(),
-            status: ReservationStatus::Pending,
-            page: 1,
-            page_size: 10,
-            is_desc: false,
-        });
+        let query = abi::ReservationQueryBuilder::default()
+            .user_id("john")
+            .resource_id("ocean_view_room_3")
+            .start("2024-01-01T00:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2024-01-09T00:00:00-0700".parse::<Timestamp>().unwrap())
+            .build()
+            .unwrap();
 
         let rsvps = manager.query(query).await.unwrap();
 

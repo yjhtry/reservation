@@ -7,7 +7,6 @@ use std::ops::Bound;
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 pub use reservation::*;
-pub use reservation_query::*;
 use sqlx::postgres::types::PgRange;
 
 use crate::{convert_to_utc_time, Error};
