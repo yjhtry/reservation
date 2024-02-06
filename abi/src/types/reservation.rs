@@ -81,7 +81,7 @@ impl<T> From<PgRange<T>> for NativeRange<T> {
 }
 
 #[derive(sqlx::Type, Debug, Clone, Copy, PartialEq, Eq)]
-#[sqlx(type_name = "reservations_status", rename_all = "lowercase")]
+#[sqlx(type_name = "reservation_status", rename_all = "lowercase")]
 pub enum RsvpStatus {
     Unknown,
     Pending,

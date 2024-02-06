@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION rsvp.query(
     uid varchar(64),
     rid varchar(64),
     during TSTZRANGE,
+    status rsvp.reservation_status DEFAULT 'pending',
     page integer DEFAULT 1,
     is_desc boolean DEFAULT false,
     page_size integer DEFAULT 10
@@ -12,9 +13,10 @@ DECLARE
 BEGIN
     -- format the sql query based on the parameters
     _sql := format(
-        'SELECT * FROM rsvp.reservations WHERE %L @> timespan AND %s
-         ORDER BY lower(timespan) %s LIMIT %s OFFSET %s',
+        'SELECT * FROM rsvp.reservations WHERE %L @> timespan AND status = %L::rsvp.reservation_status AND %s
+         ORDER BY lower(timespan) %s LIMIT %L::integer OFFSET %L::integer',
          during,
+         status,
         CASE
             WHEN rid IS NOT NULL AND uid IS NOT NULL THEN
                 'user_id = ' || quote_literal(rid) || 'AND resource_id =' || quote_literal(uid)
@@ -32,6 +34,9 @@ BEGIN
         page_size,
         (page - 1) * page_size
     );
+
+    -- log the query
+    RAISE NOTICE 'Executing query: %', _sql;
     -- execute the query
     RETURN QUERY EXECUTE _sql;
 END;

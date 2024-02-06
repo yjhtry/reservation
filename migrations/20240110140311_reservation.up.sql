@@ -1,11 +1,11 @@
-CREATE TYPE rsvp.reservations_status AS ENUM (
+CREATE TYPE rsvp.reservation_status AS ENUM (
   'unknown',
   'pending',
   'confirmed',
   'blocked'
 );
 
-CREATE TYPE rsvp.reservations_update_type AS ENUM (
+CREATE TYPE rsvp.reservation_update_type AS ENUM (
   'unknown',
   'create',
   'update',
@@ -16,7 +16,7 @@ CREATE TABLE rsvp.reservations (
   id UUID NOT NULL DEFAULT gen_random_uuid(),
   resource_id varchar(64 ) NOT NULL,
   user_id varchar(64) NOT NULL,
-  status rsvp.reservations_status NOT NULL DEFAULT 'pending',
+  status rsvp.reservation_status NOT NULL DEFAULT 'pending',
   timespan tstzrange NOT NULL,
   note text,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

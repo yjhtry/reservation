@@ -163,14 +163,14 @@ We would use postgres as the database. Below is the schema:
 
 ```sql
 CREATE SCHEMA rsvp;
-CREATE TYPE rsvp.reservations_status AS ENUM (
+CREATE TYPE rsvp.reservation_status AS ENUM (
   'unknown',
   'pending',
   'confirmed',
   'blocked'
 );
 
-CREATE TYPE rsvp.reservations_update_type AS ENUM (
+CREATE TYPE rsvp.reservation_update_type AS ENUM (
   'unknown',
   'create',
   'update',
@@ -181,7 +181,7 @@ CREATE TABLE rsvp.reservations (
   id UUID NOT NULL DEFAULT gen_random_uuid(),
   resource_id varchar(64 ) NOT NULL,
   user_id varchar(64) NOT NULL,
-  status rsvp.reservations_status NOT NULL DEFAULT 'pending',
+  status rsvp.reservation_status NOT NULL DEFAULT 'pending',
   timespan tstzrange NOT NULL,
   note text,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -205,51 +205,69 @@ $$ LANGUAGE 'plpgsql';
 CREATE TRIGGER update_updated_at BEFORE UPDATE ON rsvp.reservations
 FOR EACH ROW EXECUTE PROCEDURE rsvp.update_updated_at_column();
 
-CREATE OR REPLACE FUNCTION rsvp.query(user_id varchar(64), resource_id varchar(64), during tstzrange) RETURNS TABLE (LIKE rsvp.reservations)
+CREATE OR REPLACE FUNCTION rsvp.query(
+    uid varchar(64),
+    rid varchar(64),
+    during TSTZRANGE,
+    status rsvp.reservation_status DEFAULT 'pending',
+    page integer DEFAULT 1,
+    is_desc boolean DEFAULT false,
+    page_size integer DEFAULT 10
+) RETURNS TABLE (LIKE rsvp.reservations)
 AS $$
+DECLARE
+    _sql TEXT;
 BEGIN
-  -- if user_id is null, then return all reservations within the during
-  IF user_id IS NULL THEN
-      RETURN QUERY
-      SELECT * FROM rsvp.reservations WHERE rsvp.resource_id = resource_id AND during @> rsvp.reservations.timespan;
-  -- if resource_id is null, then return all reservations within the during
-  ELSIF resource_id IS NULL THEN
-      RETURN QUERY
-      SELECT * FROM rsvp.reservations WHERE rsvp.user_id = user_id AND during @> rsvp.reservations.timespan;
-  -- if both are null, then return all reservations within the during
-  ELSIF user_id IS NULL AND resource_id IS NULL THEN
-      RETURN QUERY
-      SELECT * FROM rsvp.reservations WHERE during @> rsvp.reservations.timespan;
-  -- if both set, then return all reservations within the during for the resource and user
-  ELSE
-      RETURN QUERY
-      SELECT * FROM rsvp.reservations
-        WHERE rsvp.reservations.user_id = user_id
-            AND rsvp.reservations.resource_id = resource_id
-            AND during @> rsvp.reservations.timespan;
-  END IF;
+    -- format the sql query based on the parameters
+    _sql := format(
+        'SELECT * FROM rsvp.reservations WHERE %L @> timespan AND status = %L::rsvp.reservation_status AND %s
+         ORDER BY lower(timespan) %s LIMIT %L::integer OFFSET %L::integer',
+         during,
+         status,
+        CASE
+            WHEN rid IS NOT NULL AND uid IS NOT NULL THEN
+                'user_id = ' || quote_literal(rid) || 'AND resource_id =' || quote_literal(uid)
+            WHEN uid IS NOT NULL THEN
+                'user_id = ' || quote_literal(uid)
+            WHEN rid IS NOT NULL THEN
+                'resource_id = ' || quote_literal(rid)
+            ELSE
+                'TRUE'
+        END,
+        CASE
+            WHEN is_desc THEN 'DESC'
+            ELSE 'ASC'
+        END,
+        page_size,
+        (page - 1) * page_size
+    );
+
+    -- log the query
+    RAISE NOTICE 'Executing query: %', _sql;
+    -- execute the query
+    RETURN QUERY EXECUTE _sql;
 END;
 $$ LANGUAGE plpgsql;
 
 
 -- reservation change queue
-CREATE TABLE rsvp.reservations_change (
+CREATE TABLE rsvp.reservation_changes (
   id SERIAL NOT NULL,
   reservation_id varchar(64) NOT NULL,
-  op rsvp.reservations_update_type NOT NULL,
+  op rsvp.reservation_update_type NOT NULL,
 );
 
 -- trigger for add/update/delete reservation
 CREATE OR REPLACE FUNCTION rsvp.reservations_trigger() RETURNS TRIGGER AS $$
 BEGIN
   IF (TG_OP = 'INSERT') THEN
-    INSERT INTO rsvp.reservations_change (reservation_id, op) VALUES (NEW.id, 'create');
+    INSERT INTO rsvp.reservation_changes (reservation_id, op) VALUES (NEW.id, 'create');
   ELSIF (TG_OP = 'UPDATE') THEN
     IF (OLD.status <> NEW.status) THEN
-      INSERT INTO rsvp.reservations_change (reservation_id, op) VALUES (NEW.id, 'update');
+      INSERT INTO rsvp.reservation_changes (reservation_id, op) VALUES (NEW.id, 'update');
     END IF;
   ELSIF (TG_OP = 'DELETE') THEN
-    INSERT INTO rsvp.reservations_change (reservation_id, op) VALUES (OLD.id, 'delete');
+    INSERT INTO rsvp.reservation_changes (reservation_id, op) VALUES (OLD.id, 'delete');
   END IF;
   -- notify a channel called reservation_update
   NOTIFY reservation_update;

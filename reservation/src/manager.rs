@@ -26,7 +26,7 @@ impl Rsvp for ReservationManager {
 
         let id: Uuid = sqlx::query(
             "INSERT INTO rsvp.reservations (user_id, resource_id, timespan, note, status)
-            VALUES ($1, $2, $3, $4, $5::rsvp.reservations_status)
+            VALUES ($1, $2, $3, $4, $5::rsvp.reservation_status)
             RETURNING id",
         )
         .bind(rsvp.user_id)
@@ -49,8 +49,8 @@ impl Rsvp for ReservationManager {
         // if current status is pending, change is to confirmed, otherwise do nothing
         let rsvp: abi::Reservation = sqlx::query_as(
             "UPDATE rsvp.reservations
-            SET status = 'confirmed'::rsvp.reservations_status
-            WHERE id = $1 AND status = 'pending'::rsvp.reservations_status
+            SET status = 'confirmed'::rsvp.reservation_status
+            WHERE id = $1 AND status = 'pending'::rsvp.reservation_status
             RETURNING *",
         )
         .bind(id)
@@ -113,6 +113,13 @@ impl Rsvp for ReservationManager {
     }
 
     async fn query(&self, _query: abi::ReservationQuery) -> Result<Vec<abi::Reservation>, Error> {
+        // let rsvps: Vec<abi::Reservation> =
+        //     sqlx::query_as("rsvp.query($1, $2, $3, $4, $5, $6, $7, $8)")
+        //         .bind(query.user_id)
+        //         .bind(query.resource_id)
+        //         .fetch_all(&self.pool)
+        //         .await?;
+
         todo!()
     }
 }
