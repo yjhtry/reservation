@@ -2,41 +2,53 @@ use std::process::Command;
 
 trait BuilderExt {
     fn types_attributes(self, paths: &[&str], attributes: &[&str]) -> Self;
-    fn fields_attributes(self, path: &str, fields: &[&str], attributes: &[&str]) -> Self;
+    fn fields_attributes(self, path: &[&str], fields: &[&str], attributes: &[&str]) -> Self;
 }
 
 fn main() {
     tonic_build::configure()
         .out_dir("src/pb")
         .types_attributes(
-            &["reservation.ReservationQuery"],
+            &[
+                "reservation.ReservationQuery",
+                "reservation.ReservationFilter",
+            ],
             &[
                 "#[derive(derive_builder::Builder)]",
                 "#[builder(setter(into), default)]",
             ],
         )
         .fields_attributes(
-            "reservation.ReservationQuery",
+            &["reservation.ReservationQuery"],
             &["start", "end"],
             &["#[builder(setter(strip_option))]"],
         )
         .fields_attributes(
-            "reservation.ReservationQuery",
+            &["reservation.ReservationQuery"],
             &["page"],
             &[r#"#[builder(default = "1")]"#],
         )
         .fields_attributes(
-            "reservation.ReservationQuery",
+            &[
+                "reservation.ReservationQuery",
+                "reservation.ReservationFilter",
+            ],
             &["page_size"],
             &[r#"#[builder(default = "10")]"#],
         )
         .fields_attributes(
-            "reservation.ReservationQuery",
+            &[
+                "reservation.ReservationQuery",
+                "reservation.ReservationFilter",
+            ],
             &["is_desc"],
             &[r#"#[builder(default = "false")]"#],
         )
         .fields_attributes(
-            "reservation.ReservationQuery",
+            &[
+                "reservation.ReservationQuery",
+                "reservation.ReservationFilter",
+            ],
             &["status"],
             &[r#"#[builder(default = "1")]"#],
         )
@@ -60,10 +72,12 @@ impl BuilderExt for tonic_build::Builder {
         })
     }
 
-    fn fields_attributes(self, path: &str, fields: &[&str], attributes: &[&str]) -> Self {
-        fields.iter().fold(self, |acc, field| {
-            attributes.iter().fold(acc, |acc, attribute| {
-                acc.field_attribute(format!("{}.{}", path, field), attribute)
+    fn fields_attributes(self, path: &[&str], fields: &[&str], attributes: &[&str]) -> Self {
+        path.iter().fold(self, |acc, path| {
+            fields.iter().fold(acc, |acc, field| {
+                attributes.iter().fold(acc, |acc, attribute| {
+                    acc.field_attribute(format!("{}.{}", path, field), attribute)
+                })
             })
         })
     }

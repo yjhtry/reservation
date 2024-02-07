@@ -123,6 +123,25 @@ impl Rsvp for ReservationManager {
 
         Ok(rsvps)
     }
+
+    async fn filter(&self, query: abi::ReservationFilter) -> Result<Vec<abi::Reservation>, Error> {
+        let status =
+            ReservationStatus::try_from(query.status).unwrap_or(ReservationStatus::Pending);
+
+        let rsvps: Vec<abi::Reservation> = sqlx::query_as(
+            "SELECT * FROM rsvp.filter($1, $2, $3::rsvp.reservation_status, $4, $5, $6)",
+        )
+        .bind(str_to_option(&query.user_id))
+        .bind(str_to_option(&query.resource_id))
+        .bind(status.to_string())
+        .bind(query.cursor)
+        .bind(query.is_desc)
+        .bind(query.page_size)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rsvps)
+    }
 }
 
 fn str_to_option(s: &str) -> Option<String> {
@@ -347,5 +366,89 @@ mod tests {
 
         assert_eq!(rsvps.len(), 1);
         assert_eq!(rsvp, rsvps[0]);
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn filter_reservation_should_work() {
+        let manager = ReservationManager::new(migrated_pool);
+        let insert = Reservation::new_pending(
+            "john",
+            "ocean_view_room_3",
+            "2024-01-01T00:00:00-0700".parse().unwrap(),
+            "2024-01-03T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
+
+        let rsvp1 = manager.reserve(insert).await.unwrap();
+
+        let filter = abi::ReservationFilterBuilder::default()
+            .user_id("john")
+            .cursor(0)
+            .build()
+            .unwrap();
+
+        let rsvps = manager.filter(filter).await.unwrap();
+
+        assert_eq!(rsvps.len(), 1);
+        assert_eq!(rsvp1, rsvps[0]);
+
+        // if the cursor is not match, should return empty
+        let filter = abi::ReservationFilterBuilder::default()
+            .user_id("john")
+            .cursor(10)
+            .resource_id("ocean_view_room_3")
+            .build()
+            .unwrap();
+
+        let rsvps = manager.filter(filter).await.unwrap();
+
+        assert_eq!(rsvps.len(), 0);
+
+        // if the cursor is match, but the desc is not match, should return empty
+        let filter = abi::ReservationFilterBuilder::default()
+            .user_id("john")
+            .cursor(0)
+            .is_desc(true)
+            .status(ReservationStatus::Confirmed as i32)
+            .build()
+            .unwrap();
+
+        let rsvps = manager.filter(filter).await.unwrap();
+
+        assert_eq!(rsvps.len(), 0);
+
+        // skip the first reservation, should return second reservation
+        let insert = Reservation::new_pending(
+            "john",
+            "ocean_view_room_3",
+            "2024-01-05T00:00:00-0700".parse().unwrap(),
+            "2024-01-06T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+        );
+
+        let rsvp2 = manager.reserve(insert).await.unwrap();
+
+        let filter = abi::ReservationFilterBuilder::default()
+            .user_id("john")
+            .cursor(1)
+            .is_desc(false)
+            .build()
+            .unwrap();
+
+        let rsvps = manager.filter(filter).await.unwrap();
+
+        assert_eq!(rsvp2, rsvps[0]);
+
+        // if the is_desc is true and the cursor is 2, should return the first reservation
+        let filter = abi::ReservationFilterBuilder::default()
+            .user_id("john")
+            .cursor(2)
+            .is_desc(true)
+            .build()
+            .unwrap();
+
+        let rsvps = manager.filter(filter).await.unwrap();
+
+        assert_eq!(rsvp1, rsvps[0]);
     }
 }

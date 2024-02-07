@@ -114,6 +114,22 @@ message QueryRequest {
   ReservationQuery query = 1;
 }
 
+message ReservationFilter {
+  string resource_id = 1;
+  string user_id = 2;
+
+  ReservationStatus status = 3;
+
+  int64 cursor = 4;
+  bool is_desc = 5;
+  // page size
+  int32 page_size = 6;
+}
+
+message FilterRequest {
+  ReservationFilter filter = 1;
+}
+
 // listen reservation updates request data
 message ListenRequest {}
 
@@ -131,6 +147,7 @@ service ReservationService {
   rpc cancel(CancelRequest) returns (CancelResponse);
   rpc get(GetRequest) returns (GetResponse);
   rpc query(QueryRequest) returns (stream Reservation);
+  rpc filter(FilterRequest) returns (stream Reservation);
   // another system can monitor the reservations and newly reserved/confirmed/canceled reservations
   rpc listen(ListenRequest) returns (stream ListenResponse);
 }

@@ -136,6 +136,34 @@ pub struct QueryRequest {
     #[prost(message, optional, tag = "1")]
     pub query: ::core::option::Option<ReservationQuery>,
 }
+#[derive(derive_builder::Builder)]
+#[builder(setter(into), default)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ReservationFilter {
+    #[prost(string, tag = "1")]
+    pub resource_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub user_id: ::prost::alloc::string::String,
+    #[prost(enumeration = "ReservationStatus", tag = "3")]
+    #[builder(default = "1")]
+    pub status: i32,
+    #[prost(int64, tag = "4")]
+    pub cursor: i64,
+    #[prost(bool, tag = "5")]
+    #[builder(default = "false")]
+    pub is_desc: bool,
+    /// page size
+    #[prost(int32, tag = "6")]
+    #[builder(default = "10")]
+    pub page_size: i32,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FilterRequest {
+    #[prost(message, optional, tag = "1")]
+    pub filter: ::core::option::Option<ReservationFilter>,
+}
 /// listen reservation updates request data
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -410,6 +438,27 @@ pub mod reservation_service_client {
                 .insert(GrpcMethod::new("reservation.ReservationService", "query"));
             self.inner.server_streaming(req, path, codec).await
         }
+        pub async fn filter(
+            &mut self,
+            request: impl tonic::IntoRequest<super::FilterRequest>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::Reservation>>,
+            tonic::Status,
+        > {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path =
+                http::uri::PathAndQuery::from_static("/reservation.ReservationService/filter");
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("reservation.ReservationService", "filter"));
+            self.inner.server_streaming(req, path, codec).await
+        }
         /// another system can monitor the reservations and newly reserved/confirmed/canceled reservations
         pub async fn listen(
             &mut self,
@@ -470,6 +519,15 @@ pub mod reservation_service_server {
             &self,
             request: tonic::Request<super::QueryRequest>,
         ) -> std::result::Result<tonic::Response<Self::queryStream>, tonic::Status>;
+        /// Server streaming response type for the filter method.
+        type filterStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::Reservation, tonic::Status>,
+            > + Send
+            + 'static;
+        async fn filter(
+            &self,
+            request: tonic::Request<super::FilterRequest>,
+        ) -> std::result::Result<tonic::Response<Self::filterStream>, tonic::Status>;
         /// Server streaming response type for the listen method.
         type listenStream: tonic::codegen::tokio_stream::Stream<
                 Item = std::result::Result<super::ListenResponse, tonic::Status>,
@@ -787,6 +845,51 @@ pub mod reservation_service_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = querySvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/reservation.ReservationService/filter" => {
+                    #[allow(non_camel_case_types)]
+                    struct filterSvc<T: ReservationService>(pub Arc<T>);
+                    impl<T: ReservationService>
+                        tonic::server::ServerStreamingService<super::FilterRequest>
+                        for filterSvc<T>
+                    {
+                        type Response = super::Reservation;
+                        type ResponseStream = T::filterStream;
+                        type Future =
+                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::FilterRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as ReservationService>::filter(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = filterSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
