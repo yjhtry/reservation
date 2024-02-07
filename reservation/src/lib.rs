@@ -1,10 +1,8 @@
 mod manager;
 
-use abi::Error;
+use abi::{Error, ReservationId};
 use async_trait::async_trait;
 use sqlx::PgPool;
-
-pub type ReservationId = String;
 
 #[derive(Debug)]
 pub struct ReservationManager {

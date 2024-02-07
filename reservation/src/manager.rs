@@ -1,6 +1,6 @@
 use abi::{ReservationStatus, Validator};
 use async_trait::async_trait;
-use sqlx::{types::Uuid, PgPool, Row};
+use sqlx::{PgPool, Row};
 
 use crate::{Error, ReservationId, ReservationManager, Rsvp};
 
@@ -15,7 +15,7 @@ impl Rsvp for ReservationManager {
 
         let status = ReservationStatus::try_from(rsvp.status).unwrap_or(ReservationStatus::Pending);
 
-        let id: Uuid = sqlx::query(
+        let id = sqlx::query(
             "INSERT INTO rsvp.reservations (user_id, resource_id, timespan, note, status)
             VALUES ($1, $2, $3, $4, $5::rsvp.reservation_status)
             RETURNING id",
@@ -29,13 +29,13 @@ impl Rsvp for ReservationManager {
         .await?
         .get(0);
 
-        return_rsvp.id = id.to_string();
+        return_rsvp.id = id;
 
         Ok(return_rsvp)
     }
 
     async fn change_status(&self, id: ReservationId) -> Result<abi::Reservation, Error> {
-        let id = Uuid::parse_str(&id).map_err(|e| Error::InvalidReservationId(e.to_string()))?;
+        id.validate()?;
 
         // if current status is pending, change is to confirmed, otherwise do nothing
         let rsvp: abi::Reservation = sqlx::query_as(
@@ -56,7 +56,7 @@ impl Rsvp for ReservationManager {
         id: ReservationId,
         note: String,
     ) -> Result<abi::Reservation, Error> {
-        let id = Uuid::parse_str(&id).map_err(|e| Error::InvalidReservationId(e.to_string()))?;
+        id.validate()?;
 
         // change note for the reservation
         let rsvp: abi::Reservation = sqlx::query_as(
@@ -76,7 +76,7 @@ impl Rsvp for ReservationManager {
     async fn delete(&self, id: ReservationId) -> Result<(), Error> {
         // delete reservation by id
 
-        let id = Uuid::parse_str(&id).map_err(|e| Error::InvalidReservationId(e.to_string()))?;
+        id.validate()?;
 
         let _ = sqlx::query("DELETE FROM rsvp.reservations WHERE id = $1")
             .bind(id)
@@ -89,7 +89,7 @@ impl Rsvp for ReservationManager {
     async fn get(&self, id: ReservationId) -> Result<abi::Reservation, Error> {
         // get reservation by id
 
-        let id = Uuid::parse_str(&id).map_err(|e| Error::InvalidReservationId(e.to_string()))?;
+        id.validate()?;
 
         let rsvp: abi::Reservation = sqlx::query_as(
             "SELECT id, user_id, resource_id, timespan, note, status
@@ -162,7 +162,7 @@ mod tests {
 
         let rsvp = manager.reserve(rsvp).await.unwrap();
 
-        assert!(!rsvp.id.is_empty());
+        assert!(rsvp.id != 0);
     }
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
@@ -210,7 +210,7 @@ mod tests {
         );
 
         let rsvp = manager.reserve(rsvp).await.unwrap();
-        let rsvp = manager.change_status(rsvp.id.clone()).await.unwrap();
+        let rsvp = manager.change_status(rsvp.id).await.unwrap();
 
         assert_eq!(rsvp.status, ReservationStatus::Confirmed as i32);
     }
@@ -227,8 +227,8 @@ mod tests {
         );
 
         let rsvp = manager.reserve(rsvp).await.unwrap();
-        let rsvp = manager.change_status(rsvp.id.clone()).await.unwrap();
-        let rsvp = manager.change_status(rsvp.id.clone()).await.unwrap_err();
+        let rsvp = manager.change_status(rsvp.id).await.unwrap();
+        let rsvp = manager.change_status(rsvp.id).await.unwrap_err();
 
         assert_eq!(rsvp, Error::NotFound);
     }
@@ -247,10 +247,7 @@ mod tests {
         let note = "new note".to_string();
 
         let rsvp = manager.reserve(rsvp).await.unwrap();
-        let rsvp = manager
-            .update_note(rsvp.id.clone(), note.clone())
-            .await
-            .unwrap();
+        let rsvp = manager.update_note(rsvp.id, note.clone()).await.unwrap();
 
         assert_eq!(rsvp.note, note);
     }
@@ -267,9 +264,9 @@ mod tests {
         );
 
         let rsvp = manager.reserve(rsvp).await.unwrap();
-        manager.delete(rsvp.id.clone()).await.unwrap();
+        manager.delete(rsvp.id).await.unwrap();
 
-        let rsvp = manager.get(rsvp.id.clone()).await.unwrap_err();
+        let rsvp = manager.get(rsvp.id).await.unwrap_err();
 
         assert_eq!(rsvp, Error::NotFound);
     }
@@ -286,7 +283,7 @@ mod tests {
         );
 
         let rsvp = manager.reserve(insert).await.unwrap();
-        let insert = manager.get(rsvp.id.clone()).await.unwrap();
+        let insert = manager.get(rsvp.id).await.unwrap();
 
         assert_eq!(insert, rsvp);
     }
@@ -345,7 +342,7 @@ mod tests {
         assert_eq!(rsvps.len(), 0);
 
         // change status to confirmed, should return the reservation
-        let rsvp = manager.change_status(rsvp.id.clone()).await.unwrap();
+        let rsvp = manager.change_status(rsvp.id).await.unwrap();
         let rsvps = manager.query(query).await.unwrap();
 
         assert_eq!(rsvps.len(), 1);

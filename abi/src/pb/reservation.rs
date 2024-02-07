@@ -4,8 +4,8 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Reservation {
     /// reservation id, when listen reservation updates, it will be used to identify the reservation
-    #[prost(string, tag = "1")]
-    pub id: ::prost::alloc::string::String,
+    #[prost(int64, tag = "1")]
+    pub id: i64,
     /// resource id
     #[prost(string, tag = "2")]
     pub resource_id: ::prost::alloc::string::String,
