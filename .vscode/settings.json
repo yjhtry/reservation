@@ -1,7 +1,9 @@
 {
   "cSpell.words": [
     "chrono",
+    "codegen",
     "datetime",
+    "dbname",
     "nanos",
     "prost",
     "protos",
@@ -10,7 +12,6 @@
     "sqlx",
     "subsec",
     "thiserror",
-    "timespan",
-    "codegen"
+    "timespan"
   ]
 }

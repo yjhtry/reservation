@@ -6,3 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+abi = { version = "0.1.0", path = "../abi" }
+anyhow = "1.0.79"
+futures = { version = "0.3.30", default-features = false }
+reservation = { version = "0.1.0", path = "../reservation" }
+serde = { version = "1.0.196", features = ["derive"] }
+serde_yaml = "0.9.31"
+tokio = { version = "1.36.0", features = ["full"] }
+tonic = { version = "0.10.2", features = ["gzip", "tls"] }
