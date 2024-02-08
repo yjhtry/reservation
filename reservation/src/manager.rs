@@ -124,11 +124,14 @@ impl Rsvp for ReservationManager {
         Ok(rsvps)
     }
 
-    async fn filter(&self, query: abi::ReservationFilter) -> Result<Vec<abi::Reservation>, Error> {
+    async fn filter(
+        &self,
+        query: abi::ReservationFilter,
+    ) -> Result<(abi::FilterPager, Vec<abi::Reservation>), Error> {
         let status =
             ReservationStatus::try_from(query.status).unwrap_or(ReservationStatus::Pending);
 
-        let rsvps: Vec<abi::Reservation> = sqlx::query_as(
+        let mut rsvps: Vec<abi::Reservation> = sqlx::query_as(
             "SELECT * FROM rsvp.filter($1, $2, $3::rsvp.reservation_status, $4, $5, $6)",
         )
         .bind(str_to_option(&query.user_id))
@@ -140,7 +143,31 @@ impl Rsvp for ReservationManager {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rsvps)
+        if query.is_desc {
+            rsvps.reverse();
+        }
+
+        let mut prev = -1;
+        let mut next = -1;
+
+        if let Some(start) = rsvps.first() {
+            prev = start.id;
+        }
+
+        if rsvps.len() == (query.page_size as usize) {
+            if let Some(end) = rsvps.last() {
+                next = end.id;
+            }
+        }
+
+        let pager = abi::FilterPager {
+            prev,
+            next,
+            // TODO optimize total sum
+            total: 0,
+        };
+
+        Ok((pager, rsvps))
     }
 }
 
@@ -387,7 +414,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let rsvps = manager.filter(filter).await.unwrap();
+        let (_, rsvps) = manager.filter(filter).await.unwrap();
 
         assert_eq!(rsvps.len(), 1);
         assert_eq!(rsvp1, rsvps[0]);
@@ -400,7 +427,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let rsvps = manager.filter(filter).await.unwrap();
+        let (_, rsvps) = manager.filter(filter).await.unwrap();
 
         assert_eq!(rsvps.len(), 0);
 
@@ -413,7 +440,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let rsvps = manager.filter(filter).await.unwrap();
+        let (_, rsvps) = manager.filter(filter).await.unwrap();
 
         assert_eq!(rsvps.len(), 0);
 
@@ -435,7 +462,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let rsvps = manager.filter(filter).await.unwrap();
+        let (_, rsvps) = manager.filter(filter).await.unwrap();
 
         assert_eq!(rsvp2, rsvps[0]);
 
@@ -447,8 +474,63 @@ mod tests {
             .build()
             .unwrap();
 
-        let rsvps = manager.filter(filter).await.unwrap();
+        let (_, rsvps) = manager.filter(filter).await.unwrap();
 
         assert_eq!(rsvp1, rsvps[0]);
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn filter_pager_should_work() {
+        let manager = ReservationManager::new(migrated_pool);
+        let mut reservation_list = vec![];
+
+        for i in 1..20 {
+            let insert = Reservation::new_pending(
+                "john",
+                "ocean_view_room_3",
+                format!("2024-01-{:02}T00:00:00-0700", i).parse().unwrap(),
+                format!("2024-01-{:02}T00:00:00-0700", i + 1)
+                    .parse()
+                    .unwrap(),
+                "I'll arrive at 3pm, Please help to upgrade to executive room if possible.",
+            );
+
+            reservation_list.push(manager.reserve(insert).await.unwrap());
+        }
+
+        let filter = abi::ReservationFilterBuilder::default()
+            .user_id("john")
+            .cursor(2)
+            .build()
+            .unwrap();
+
+        let (pager, _) = manager.filter(filter).await.unwrap();
+
+        assert_eq!(pager.prev, 3);
+        assert_eq!(pager.next, 12);
+
+        let filter = abi::ReservationFilterBuilder::default()
+            .user_id("john")
+            .cursor(pager.next)
+            .build()
+            .unwrap();
+
+        let (pager, _) = manager.filter(filter).await.unwrap();
+
+        assert_eq!(pager.prev, 13);
+        assert_eq!(pager.next, -1);
+
+        let filter = abi::ReservationFilterBuilder::default()
+            .user_id("john")
+            .cursor(pager.prev)
+            .is_desc(true)
+            .build()
+            .unwrap();
+
+        let (pager, _) = manager.filter(filter).await.unwrap();
+        println!("{:?}", pager);
+
+        assert_eq!(pager.prev, 3);
+        assert_eq!(pager.next, 12);
     }
 }

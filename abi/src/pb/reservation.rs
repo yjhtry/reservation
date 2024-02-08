@@ -164,6 +164,24 @@ pub struct FilterRequest {
     #[prost(message, optional, tag = "1")]
     pub filter: ::core::option::Option<ReservationFilter>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FilterPager {
+    #[prost(int64, tag = "1")]
+    pub prev: i64,
+    #[prost(int64, tag = "2")]
+    pub next: i64,
+    #[prost(int64, tag = "3")]
+    pub total: i64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FilterResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub reservations: ::prost::alloc::vec::Vec<Reservation>,
+    #[prost(message, optional, tag = "2")]
+    pub pager: ::core::option::Option<FilterPager>,
+}
 /// listen reservation updates request data
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -441,10 +459,7 @@ pub mod reservation_service_client {
         pub async fn filter(
             &mut self,
             request: impl tonic::IntoRequest<super::FilterRequest>,
-        ) -> std::result::Result<
-            tonic::Response<tonic::codec::Streaming<super::Reservation>>,
-            tonic::Status,
-        > {
+        ) -> std::result::Result<tonic::Response<super::FilterResponse>, tonic::Status> {
             self.inner.ready().await.map_err(|e| {
                 tonic::Status::new(
                     tonic::Code::Unknown,
@@ -457,7 +472,7 @@ pub mod reservation_service_client {
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("reservation.ReservationService", "filter"));
-            self.inner.server_streaming(req, path, codec).await
+            self.inner.unary(req, path, codec).await
         }
         /// another system can monitor the reservations and newly reserved/confirmed/canceled reservations
         pub async fn listen(
@@ -519,15 +534,10 @@ pub mod reservation_service_server {
             &self,
             request: tonic::Request<super::QueryRequest>,
         ) -> std::result::Result<tonic::Response<Self::queryStream>, tonic::Status>;
-        /// Server streaming response type for the filter method.
-        type filterStream: tonic::codegen::tokio_stream::Stream<
-                Item = std::result::Result<super::Reservation, tonic::Status>,
-            > + Send
-            + 'static;
         async fn filter(
             &self,
             request: tonic::Request<super::FilterRequest>,
-        ) -> std::result::Result<tonic::Response<Self::filterStream>, tonic::Status>;
+        ) -> std::result::Result<tonic::Response<super::FilterResponse>, tonic::Status>;
         /// Server streaming response type for the listen method.
         type listenStream: tonic::codegen::tokio_stream::Stream<
                 Item = std::result::Result<super::ListenResponse, tonic::Status>,
@@ -863,14 +873,9 @@ pub mod reservation_service_server {
                 "/reservation.ReservationService/filter" => {
                     #[allow(non_camel_case_types)]
                     struct filterSvc<T: ReservationService>(pub Arc<T>);
-                    impl<T: ReservationService>
-                        tonic::server::ServerStreamingService<super::FilterRequest>
-                        for filterSvc<T>
-                    {
-                        type Response = super::Reservation;
-                        type ResponseStream = T::filterStream;
-                        type Future =
-                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                    impl<T: ReservationService> tonic::server::UnaryService<super::FilterRequest> for filterSvc<T> {
+                        type Response = super::FilterResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::FilterRequest>,
@@ -900,7 +905,7 @@ pub mod reservation_service_server {
                                 max_decoding_message_size,
                                 max_encoding_message_size,
                             );
-                        let res = grpc.server_streaming(method, req).await;
+                        let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)

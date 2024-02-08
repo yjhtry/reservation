@@ -65,8 +65,8 @@ AS $$
 DECLARE
     _sql TEXT;
 BEGIN
-    -- if cursor is less is null when is_desc is true, set it to int64 max or 0
-    IF cursor IS NULL THEN
+    -- if cursor is less than 1 or is null when is_desc is true, set it to int64 max or 0
+    IF cursor IS NULL OR cursor <= 0 THEN
         IF is_desc THEN
             cursor := 9223372036854775807;
         ELSE
@@ -82,7 +82,7 @@ BEGIN
     -- format the sql query based on the parameters
     _sql := format(
         'SELECT * FROM rsvp.reservations WHERE %s AND status = %L::rsvp.reservation_status AND %s
-         ORDER BY id %s LIMIT %L::integer',
+        ORDER BY id %s LIMIT %L::integer',
          CASE
             WHEN is_desc THEN 'id < ' || cursor
             ELSE 'id > ' || cursor

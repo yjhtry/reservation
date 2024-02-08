@@ -130,6 +130,18 @@ message FilterRequest {
   ReservationFilter filter = 1;
 }
 
+message FilterPager {
+  int64 prev =1;
+  int64 next = 2;
+  int64 total = 3;
+}
+
+message FilterResponse {
+  repeated Reservation reservations = 1;
+
+  FilterPager pager = 2;
+}
+
 // listen reservation updates request data
 message ListenRequest {}
 
@@ -147,7 +159,7 @@ service ReservationService {
   rpc cancel(CancelRequest) returns (CancelResponse);
   rpc get(GetRequest) returns (GetResponse);
   rpc query(QueryRequest) returns (stream Reservation);
-  rpc filter(FilterRequest) returns (stream Reservation);
+  rpc filter(FilterRequest) returns (FilterResponse);
   // another system can monitor the reservations and newly reserved/confirmed/canceled reservations
   rpc listen(ListenRequest) returns (stream ListenResponse);
 }
