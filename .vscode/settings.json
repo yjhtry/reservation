@@ -9,6 +9,7 @@
     "protos",
     "repr",
     "rsvps",
+    "shellexpand",
     "sqlx",
     "subsec",
     "thiserror",

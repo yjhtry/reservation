@@ -48,7 +48,6 @@ pub struct ServerConfig {
     pub port: u16,
 }
 
-#[allow(dead_code)]
 impl Config {
     pub fn load(filename: &str) -> Result<Config, Error> {
         let file = fs::read_to_string(filename).map_err(|_| Error::ReadConfigError)?;
@@ -70,7 +69,7 @@ mod tests {
         assert_eq!(config.db.user, "yjh");
         assert_eq!(config.db.password, "");
         assert_eq!(config.db.dbname, "reservation");
-        assert_eq!(config.server.host, "localhost");
+        assert_eq!(config.server.host, "0.0.0.0");
         assert_eq!(config.server.port, 3333);
     }
 }

@@ -14,13 +14,13 @@ use tonic::{Request, Response, Status};
 type ReservationStream = Pin<Box<dyn Stream<Item = Result<Reservation, Status>> + Send>>;
 type ListenStream = Pin<Box<dyn Stream<Item = Result<ListenResponse, Status>> + Send>>;
 
-struct RsvpService {
+pub struct RsvpService {
     manager: ReservationManager,
 }
 
 #[allow(dead_code)]
 impl RsvpService {
-    async fn from_config(config: DbConfig) -> Result<Self, Error> {
+    pub async fn from_config(config: DbConfig) -> Result<Self, Error> {
         let manager = ReservationManager::from_config(config).await?;
         Ok(Self { manager })
     }
