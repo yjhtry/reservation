@@ -11,6 +11,8 @@ dependencies = [
  "prost",
  "prost-types",
  "regex",
+ "serde",
+ "serde_yaml",
  "sqlx",
  "thiserror",
  "tonic",

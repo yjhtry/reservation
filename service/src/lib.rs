@@ -10,8 +10,6 @@ use abi::{
 };
 use tonic::{Request, Response, Status};
 
-mod config;
-
 type ReservationStream = Pin<Box<dyn Stream<Item = Result<Reservation, Status>> + Send>>;
 type ListenStream = Pin<Box<dyn Stream<Item = Result<ListenResponse, Status>> + Send>>;
 

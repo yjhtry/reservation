@@ -1,3 +1,4 @@
+mod config;
 mod error;
 mod pb;
 mod types;
@@ -7,6 +8,8 @@ pub use error::*;
 pub use pb::*;
 pub use types::*;
 pub use utils::*;
+
+pub use config::*;
 
 pub type ReservationId = i64;
 

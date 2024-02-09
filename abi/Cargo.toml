@@ -11,6 +11,8 @@ derive_builder = "0.13.0"
 prost = "0.12.3"
 prost-types = "0.12.3"
 regex = "1.10.2"
+serde = { version = "1.0.196", features = ["derive"] }
+serde_yaml = "0.9.31"
 sqlx = { version = "0.6.0", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
 thiserror = "1.0.56"
 tonic = { version = "0.10.2", features = ["gzip"] }

@@ -1,6 +1,6 @@
-use abi::{ReservationStatus, Validator};
+use abi::{DbConfig, ReservationStatus, Validator};
 use async_trait::async_trait;
-use sqlx::{PgPool, Row};
+use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 
 use crate::{Error, ReservationId, ReservationManager, Rsvp};
 
@@ -182,6 +182,17 @@ fn str_to_option(s: &str) -> Option<String> {
 impl ReservationManager {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    pub async fn from_config(config: DbConfig) -> Result<Self, Error> {
+        let url = config.url();
+
+        let pool = PgPoolOptions::new()
+            .max_connections(config.max_connects)
+            .connect(&url)
+            .await?;
+
+        Ok(Self::new(pool))
     }
 }
 

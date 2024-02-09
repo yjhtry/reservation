@@ -10,6 +10,12 @@ pub enum Error {
     #[error("unknown error")]
     Unknown,
 
+    #[error("Read config error")]
+    ReadConfigError,
+
+    #[error("Parse config error")]
+    ParseConfigError,
+
     #[error("Database error")]
     DbError(sqlx::Error),
 
@@ -39,6 +45,8 @@ impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Unknown, Self::Unknown) => true,
+            (Self::ReadConfigError, Self::ReadConfigError) => true,
+            (Self::ParseConfigError, Self::ParseConfigError) => true,
             (Self::DbError(_), Self::DbError(_)) => true,
             (Self::ConflictReservation(v1), Self::ConflictReservation(v2)) => v1 == v2,
             (Self::NotFound, Self::NotFound) => true,
