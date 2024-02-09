@@ -1,6 +1,9 @@
+use futures::StreamExt;
+use tokio::sync::mpsc;
+
 use abi::{DbConfig, ReservationStatus, Validator};
 use async_trait::async_trait;
-use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use sqlx::{postgres::PgPoolOptions, Either, PgPool, Row};
 
 use crate::{Error, ReservationId, ReservationManager, Rsvp};
 
@@ -103,12 +106,17 @@ impl Rsvp for ReservationManager {
         Ok(rsvp)
     }
 
-    async fn query(&self, query: abi::ReservationQuery) -> Result<Vec<abi::Reservation>, Error> {
+    async fn query(
+        &self,
+        query: abi::ReservationQuery,
+    ) -> mpsc::Receiver<Result<abi::Reservation, abi::Error>> {
         let timespan = query.get_timespan();
         let status =
             ReservationStatus::try_from(query.status).unwrap_or(ReservationStatus::Pending);
 
-        let rsvps: Vec<abi::Reservation> = sqlx::query_as(
+        let (tx, rx) = mpsc::channel(128);
+
+        let mut rsvps = sqlx::query_as(
             "SELECT * FROM rsvp.query($1, $2, $3, $4::rsvp.reservation_status, $5, $6, $7)",
         )
         .bind(str_to_option(&query.user_id))
@@ -118,10 +126,30 @@ impl Rsvp for ReservationManager {
         .bind(query.is_desc)
         .bind(query.page)
         .bind(query.page_size)
-        .fetch_all(&self.pool)
-        .await?;
+        .fetch_many(&self.pool);
 
-        Ok(rsvps)
+        while let Some(ret) = rsvps.next().await {
+            match ret {
+                Ok(Either::Left(r)) => {
+                    println!("Query result: {:?}", r);
+                }
+                Ok(Either::Right(r)) => {
+                    if tx.send(Ok(r)).await.is_err() {
+                        // rx is dropped, so client disconnected
+                        break;
+                    }
+                }
+                Err(e) => {
+                    println!("Query error: {:?}", e);
+                    if tx.send(Err(e.into())).await.is_err() {
+                        // rx is dropped, so client disconnected
+                        break;
+                    }
+                }
+            }
+        }
+
+        rx
     }
 
     async fn filter(
@@ -366,10 +394,9 @@ mod tests {
             .build()
             .unwrap();
 
-        let rsvps = manager.query(query).await.unwrap();
-
-        assert_eq!(rsvps.len(), 1);
-        assert_eq!(rsvp, rsvps[0]);
+        let mut rx = manager.query(query).await;
+        assert_eq!(rx.recv().await, Some(Ok(rsvp.clone())));
+        assert_eq!(rx.recv().await, None);
 
         // if the window is not match, should return empty
         let query = abi::ReservationQueryBuilder::default()
@@ -380,9 +407,8 @@ mod tests {
             .build()
             .unwrap();
 
-        let rsvps = manager.query(query).await.unwrap();
-
-        assert_eq!(rsvps.len(), 0);
+        let mut rx = manager.query(query).await;
+        assert_eq!(rx.recv().await, None);
 
         // if the status is not match, should return empty
         let query = abi::ReservationQueryBuilder::default()
@@ -394,16 +420,14 @@ mod tests {
             .build()
             .unwrap();
 
-        let rsvps = manager.query(query.clone()).await.unwrap();
-
-        assert_eq!(rsvps.len(), 0);
+        let mut rx = manager.query(query.clone()).await;
+        assert_eq!(rx.recv().await, None);
 
         // change status to confirmed, should return the reservation
         let rsvp = manager.change_status(rsvp.id).await.unwrap();
-        let rsvps = manager.query(query).await.unwrap();
+        let mut rx = manager.query(query).await;
 
-        assert_eq!(rsvps.len(), 1);
-        assert_eq!(rsvp, rsvps[0]);
+        assert_eq!(rx.recv().await, Some(Ok(rsvp)));
     }
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]

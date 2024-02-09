@@ -3,6 +3,7 @@ mod manager;
 use abi::{Error, ReservationId};
 use async_trait::async_trait;
 use sqlx::PgPool;
+use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub struct ReservationManager {
@@ -32,7 +33,10 @@ pub trait Rsvp {
     async fn get(&self, reservation_id: ReservationId) -> Result<abi::Reservation, Error>;
 
     /// get all reservations
-    async fn query(&self, query: abi::ReservationQuery) -> Result<Vec<abi::Reservation>, Error>;
+    async fn query(
+        &self,
+        query: abi::ReservationQuery,
+    ) -> mpsc::Receiver<Result<abi::Reservation, abi::Error>>;
 
     /// get reservations order by id
     async fn filter(

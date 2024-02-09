@@ -53,8 +53,9 @@ message ReserveResponse {
 
 // update reservation request data
 message updateRequest {
-  ReservationStatus status = 1;
-  string note = 2;
+  int64 id = 1;
+  ReservationStatus status = 2;
+  string note = 3;
 }
 
 // update reservation response data
@@ -64,7 +65,7 @@ message UpdateResponse {
 
 // confirm reservation request data
 message ConfirmRequest {
-  string id = 1;
+  int64 id = 1;
 }
 
 // confirm reservation response data
@@ -74,7 +75,7 @@ message ConfirmResponse {
 
 // cancel reservation request data
 message CancelRequest {
-  string id = 1;
+  int64 id = 1;
 }
 
 // cancel reservation response data
@@ -84,7 +85,7 @@ message CancelResponse {
 
 // get reservation request data
 message GetRequest {
-  string id = 1;
+  int64 id = 1;
 }
 
 // get reservation response data

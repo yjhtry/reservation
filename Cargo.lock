@@ -1316,6 +1316,7 @@ dependencies = [
  "abi",
  "anyhow",
  "async-trait",
+ "futures",
  "prost-types",
  "sqlx",
  "sqlx-database-tester",

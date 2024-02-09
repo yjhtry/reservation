@@ -9,9 +9,11 @@ edition = "2021"
 abi = { version = "0.1.0", path = "../abi" }
 anyhow = "1.0.79"
 async-trait = "0.1.77"
+futures = { version = "0.3.30", default-features = false }
 prost-types = "0.12.3"
 sqlx = { version = "0.6.0", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
 thiserror = "1.0.56"
+tokio = { version = "1.35.1", features = ["full"] }
 
 [dev-dependencies]
 sqlx-database-tester = { version = "0.4.2", features = ["runtime-tokio"] }
