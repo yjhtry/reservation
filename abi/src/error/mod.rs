@@ -77,3 +77,32 @@ impl From<sqlx::Error> for Error {
         }
     }
 }
+
+impl From<crate::Error> for tonic::Status {
+    fn from(e: crate::Error) -> Self {
+        match e {
+            crate::Error::Unknown => tonic::Status::internal("Unknown error"),
+            crate::Error::DbError(_) => tonic::Status::internal("Database error"),
+            crate::Error::ReadConfigError => tonic::Status::internal("Read config error"),
+            crate::Error::ParseConfigError => tonic::Status::internal("Parse config error"),
+            crate::Error::ConflictReservation(info) => {
+                let msg = format!("Conflict reservation: {:?}", info);
+                tonic::Status::already_exists(msg)
+            }
+            crate::Error::NotFound => {
+                tonic::Status::not_found("No reservation found by the given condition")
+            }
+            crate::Error::InvalidTime => tonic::Status::invalid_argument(
+                "Invalid start time or end time for the reservation",
+            ),
+            crate::Error::InvalidUserId(_) => tonic::Status::invalid_argument("Invalid user id"),
+            crate::Error::InvalidReservationId(_) => {
+                tonic::Status::invalid_argument("Invalid reservation id")
+            }
+            crate::Error::InvalidResourceId(_) => {
+                tonic::Status::invalid_argument("Invalid resource id")
+            }
+            crate::Error::InvalidStatus(_) => tonic::Status::invalid_argument("Invalid status"),
+        }
+    }
+}

@@ -1,35 +1,28 @@
+use anyhow::Error;
 use futures::stream::Stream;
-use reservation::ReservationManager;
-use std::{ops::Deref, pin::Pin};
+use reservation::{ReservationManager, Rsvp};
+use std::pin::Pin;
 
 use abi::{
     reservation_service_server::ReservationService, CancelRequest, CancelResponse, ConfirmRequest,
-    ConfirmResponse, FilterRequest, FilterResponse, GetRequest, GetResponse, ListenRequest,
-    ListenResponse, QueryRequest, Reservation, ReserveRequest, ReserveResponse, UpdateRequest,
-    UpdateResponse,
+    ConfirmResponse, DbConfig, FilterRequest, FilterResponse, GetRequest, GetResponse,
+    ListenRequest, ListenResponse, QueryRequest, Reservation, ReserveRequest, ReserveResponse,
+    UpdateRequest, UpdateResponse,
 };
 use tonic::{Request, Response, Status};
 
 type ReservationStream = Pin<Box<dyn Stream<Item = Result<Reservation, Status>> + Send>>;
 type ListenStream = Pin<Box<dyn Stream<Item = Result<ListenResponse, Status>> + Send>>;
 
-struct RsvpService(ReservationManager);
-
-impl Deref for RsvpService {
-    type Target = ReservationManager;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+struct RsvpService {
+    manager: ReservationManager,
 }
 
 #[allow(dead_code)]
 impl RsvpService {
-    async fn new() -> Result<Self, Status> {
-        todo!()
-        // let config = config::Config::from_env()?;
-        // let manager = ReservationManager::new(config.db).await?;
-        // Ok(Self(manager))
+    async fn from_config(config: DbConfig) -> Result<Self, Error> {
+        let manager = ReservationManager::from_config(config).await?;
+        Ok(Self { manager })
     }
 }
 
@@ -37,9 +30,19 @@ impl RsvpService {
 impl ReservationService for RsvpService {
     async fn reserve(
         &self,
-        _request: Request<ReserveRequest>,
+        request: Request<ReserveRequest>,
     ) -> std::result::Result<Response<ReserveResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+
+        if request.reservation.is_none() {
+            return Err(Status::invalid_argument("reservation is required"));
+        }
+
+        let reservation = self.manager.reserve(request.reservation.unwrap()).await?;
+
+        Ok(Response::new(ReserveResponse {
+            reservation: Some(reservation),
+        }))
     }
     async fn confirm(
         &self,
