@@ -67,7 +67,7 @@ mod tests {
         assert_eq!(config.db.host, "localhost");
         assert_eq!(config.db.port, 5432);
         assert_eq!(config.db.user, "postgres");
-        assert_eq!(config.db.password, "");
+        assert_eq!(config.db.password, "postgres");
         assert_eq!(config.db.dbname, "reservation");
         assert_eq!(config.server.host, "0.0.0.0");
         assert_eq!(config.server.port, 3333);

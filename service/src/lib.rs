@@ -8,6 +8,8 @@ use tonic::Status;
 
 mod service;
 
+mod test_util;
+
 pub type ReservationStream = Pin<Box<dyn Stream<Item = Result<Reservation, Status>> + Send>>;
 pub type ListenStream = Pin<Box<dyn Stream<Item = Result<ListenResponse, Status>> + Send>>;
 

@@ -134,88 +134,10 @@ impl ReservationService for RsvpService {
 
 #[cfg(test)]
 mod tests {
+    use abi::{Reservation, ReservationStatus};
+
     use super::*;
-    use abi::{Config, Reservation};
-    use lazy_static::lazy_static;
-    use sqlx::{types::Uuid, Connection, Executor, PgConnection};
-    use std::{ops::Deref, sync::Arc, thread};
-    use tokio::runtime::Runtime;
-
-    lazy_static! {
-        static ref TEST_RT: Runtime = Runtime::new().unwrap();
-    }
-
-    struct TestConfig {
-        config: Arc<Config>,
-    }
-
-    impl Deref for TestConfig {
-        type Target = Config;
-
-        fn deref(&self) -> &Self::Target {
-            &self.config
-        }
-    }
-
-    impl TestConfig {
-        pub fn new() -> Self {
-            let mut config = Config::load("../service/fixtures/config.yaml").unwrap();
-            let uuid = Uuid::new_v4();
-            let dbname = format!("test_{}", uuid);
-            config.db.dbname = dbname.clone();
-
-            let server_url = config.db.server_url();
-            let url = config.db.url();
-
-            // create database dbname
-            thread::spawn(move || {
-                TEST_RT.block_on(async move {
-                    // use server url to create database
-                    let mut conn = PgConnection::connect(&server_url).await.unwrap();
-                    conn.execute(format!(r#"CREATE DATABASE "{}""#, dbname).as_str())
-                        .await
-                        .unwrap();
-
-                    // now connect to test database for migration
-                    let mut conn = PgConnection::connect(&url).await.unwrap();
-                    sqlx::migrate!("../migrations")
-                        .run(&mut conn)
-                        .await
-                        .unwrap();
-                });
-            })
-            .join()
-            .expect("failed to create database");
-
-            Self {
-                config: Arc::new(config),
-            }
-        }
-    }
-
-    impl Drop for TestConfig {
-        fn drop(&mut self) {
-            let server_url = self.db.server_url();
-            let dbname = self.config.db.dbname.clone();
-
-            thread::spawn(move || {
-                TEST_RT.block_on(async move {
-                    let mut conn = sqlx::PgConnection::connect(&server_url).await.unwrap();
-                    // terminate existing connections
-                    sqlx::query(&format!(r#"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = '{}'"#, dbname))
-                    .execute(&mut conn)
-                    .await
-                    .expect("Terminate all other connections");
-
-                    conn.execute(format!(r#"DROP DATABASE "{}""#, dbname).as_str())
-                        .await
-                        .expect("Error while querying the drop database");
-                });
-            })
-            .join()
-            .expect("failed to drop database");
-        }
-    }
+    use crate::test_util::tests::TestConfig;
 
     #[tokio::test]
     async fn rpc_reserve_should_work() {
@@ -234,13 +156,130 @@ mod tests {
         });
         let response = service.reserve(request).await.unwrap();
         let reservation1 = response.into_inner().reservation;
+
         assert!(reservation1.is_some());
+
         let reservation1 = reservation1.unwrap();
+
         assert_eq!(reservation1.user_id, reservation.user_id);
         assert_eq!(reservation1.resource_id, reservation.resource_id);
         assert_eq!(reservation1.start, reservation.start);
         assert_eq!(reservation1.end, reservation.end);
         assert_eq!(reservation1.note, reservation.note);
         assert_eq!(reservation1.status, reservation.status);
+    }
+
+    #[tokio::test]
+    async fn rpc_confirm_should_work() {
+        let config = TestConfig::new();
+
+        let service = RsvpService::from_config(&config).await.unwrap();
+        let reservation = service
+            .manager
+            .reserve(Reservation::new_pending(
+                "john",
+                "room_01",
+                "2022-12-26T15:00:00-0700".parse().unwrap(),
+                "2022-12-30T12:00:00-0700".parse().unwrap(),
+                "I need this room for a meeting",
+            ))
+            .await
+            .unwrap();
+
+        let request = tonic::Request::new(ConfirmRequest { id: reservation.id });
+        let response = service.confirm(request).await.unwrap();
+        let reservation1 = response.into_inner().reservation;
+
+        assert!(reservation1.is_some());
+
+        let reservation1 = reservation1.unwrap();
+
+        assert_eq!(reservation1.status, ReservationStatus::Confirmed as i32);
+    }
+
+    #[tokio::test]
+    async fn rpc_update_should_work() {
+        let config = TestConfig::new();
+
+        let service = RsvpService::from_config(&config).await.unwrap();
+        let reservation = service
+            .manager
+            .reserve(Reservation::new_pending(
+                "john",
+                "room_01",
+                "2022-12-26T15:00:00-0700".parse().unwrap(),
+                "2022-12-30T12:00:00-0700".parse().unwrap(),
+                "I need this room for a meeting",
+            ))
+            .await
+            .unwrap();
+
+        let request = tonic::Request::new(UpdateRequest {
+            id: reservation.id,
+            note: "I need this room for a meeting with the CEO".to_string(),
+        });
+        let response = service.update(request).await.unwrap();
+        let reservation1 = response.into_inner().reservation;
+
+        assert!(reservation1.is_some());
+
+        let reservation1 = reservation1.unwrap();
+
+        assert_eq!(
+            reservation1.note,
+            "I need this room for a meeting with the CEO".to_string()
+        );
+    }
+
+    #[tokio::test]
+    async fn rpc_cancel_should_work() {
+        let config = TestConfig::new();
+
+        let service = RsvpService::from_config(&config).await.unwrap();
+        let reservation = service
+            .manager
+            .reserve(Reservation::new_pending(
+                "john",
+                "room_01",
+                "2022-12-26T15:00:00-0700".parse().unwrap(),
+                "2022-12-30T12:00:00-0700".parse().unwrap(),
+                "I need this room for a meeting",
+            ))
+            .await
+            .unwrap();
+
+        let request = tonic::Request::new(CancelRequest { id: reservation.id });
+        let response = service.cancel(request).await.unwrap();
+        let reservation1 = response.into_inner().reservation;
+
+        assert!(reservation1.is_none());
+    }
+
+    #[tokio::test]
+    async fn rpc_get_should_work() {
+        let config = TestConfig::new();
+
+        let service = RsvpService::from_config(&config).await.unwrap();
+        let reservation = service
+            .manager
+            .reserve(Reservation::new_pending(
+                "john",
+                "room_01",
+                "2022-12-26T15:00:00-0700".parse().unwrap(),
+                "2022-12-30T12:00:00-0700".parse().unwrap(),
+                "I need this room for a meeting",
+            ))
+            .await
+            .unwrap();
+
+        let request = tonic::Request::new(GetRequest { id: reservation.id });
+        let response = service.get(request).await.unwrap();
+        let reservation1 = response.into_inner().reservation;
+
+        assert!(reservation1.is_some());
+
+        let reservation1 = reservation1.unwrap();
+
+        assert_eq!(reservation1.id, reservation.id);
     }
 }

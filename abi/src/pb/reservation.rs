@@ -45,8 +45,7 @@ pub struct ReserveResponse {
 pub struct UpdateRequest {
     #[prost(int64, tag = "1")]
     pub id: i64,
-    #[prost(enumeration = "ReservationStatus", tag = "2")]
-    pub status: i32,
+    /// ReservationStatus status = 2;
     #[prost(string, tag = "3")]
     pub note: ::prost::alloc::string::String,
 }

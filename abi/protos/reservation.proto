@@ -54,7 +54,7 @@ message ReserveResponse {
 // update reservation request data
 message updateRequest {
   int64 id = 1;
-  ReservationStatus status = 2;
+  // ReservationStatus status = 2;
   string note = 3;
 }
 
