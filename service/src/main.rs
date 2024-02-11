@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
 
     let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port).parse()?;
 
-    let svc = RsvpService::from_config(config.db).await?;
+    let svc = RsvpService::from_config(&config).await?;
     let svc = abi::reservation_service_server::ReservationServiceServer::new(svc);
 
     println!("Listening on {}", addr);

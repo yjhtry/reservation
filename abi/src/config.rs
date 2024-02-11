@@ -23,18 +23,18 @@ pub struct DbConfig {
 }
 
 impl DbConfig {
-    pub fn url(&self) -> String {
+    pub fn server_url(&self) -> String {
         if self.password.is_empty() {
-            format!(
-                "postgres://{}@{}:{}/{}",
-                self.user, self.host, self.port, self.dbname
-            )
+            format!("postgres://{}@{}:{}", self.user, self.host, self.port)
         } else {
             format!(
-                "postgres://{}:{}@{}:{}/{}",
-                self.user, self.password, self.host, self.port, self.dbname
+                "postgres://{}:{}@{}:{}",
+                self.user, self.password, self.host, self.port,
             )
         }
+    }
+    pub fn url(&self) -> String {
+        self.server_url() + "/" + &self.dbname
     }
 }
 
@@ -66,7 +66,7 @@ mod tests {
 
         assert_eq!(config.db.host, "localhost");
         assert_eq!(config.db.port, 5432);
-        assert_eq!(config.db.user, "yjh");
+        assert_eq!(config.db.user, "postgres");
         assert_eq!(config.db.password, "");
         assert_eq!(config.db.dbname, "reservation");
         assert_eq!(config.server.host, "0.0.0.0");

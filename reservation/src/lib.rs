@@ -1,13 +1,30 @@
 mod manager;
 
-use abi::{Error, ReservationId};
+use abi::{DbConfig, Error, ReservationId};
 use async_trait::async_trait;
-use sqlx::PgPool;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub struct ReservationManager {
     pub pool: PgPool,
+}
+
+impl ReservationManager {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    pub async fn from_config(config: &DbConfig) -> Result<Self, Error> {
+        let url = config.url();
+
+        let pool = PgPoolOptions::new()
+            .max_connections(config.max_connects)
+            .connect(&url)
+            .await?;
+
+        Ok(Self::new(pool))
+    }
 }
 
 #[async_trait]

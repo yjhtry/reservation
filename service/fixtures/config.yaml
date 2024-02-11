@@ -1,7 +1,7 @@
 db:
   host: localhost
   port: 5432
-  user: yjh
+  user: postgres
   password:
   dbname: reservation
 

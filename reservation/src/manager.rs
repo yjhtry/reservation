@@ -1,9 +1,9 @@
 use futures::StreamExt;
 use tokio::sync::mpsc;
 
-use abi::{DbConfig, ReservationStatus, Validator};
+use abi::{ReservationStatus, Validator};
 use async_trait::async_trait;
-use sqlx::{postgres::PgPoolOptions, Either, PgPool, Row};
+use sqlx::{Either, Row};
 
 use crate::{Error, ReservationId, ReservationManager, Rsvp};
 
@@ -204,23 +204,6 @@ fn str_to_option(s: &str) -> Option<String> {
         None
     } else {
         Some(s.to_string())
-    }
-}
-
-impl ReservationManager {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn from_config(config: DbConfig) -> Result<Self, Error> {
-        let url = config.url();
-
-        let pool = PgPoolOptions::new()
-            .max_connections(config.max_connects)
-            .connect(&url)
-            .await?;
-
-        Ok(Self::new(pool))
     }
 }
 
@@ -563,7 +546,6 @@ mod tests {
             .unwrap();
 
         let (pager, _) = manager.filter(filter).await.unwrap();
-        println!("{:?}", pager);
 
         assert_eq!(pager.prev, 3);
         assert_eq!(pager.next, 12);
