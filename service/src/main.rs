@@ -1,5 +1,5 @@
-use reservation_service::RsvpService;
-use std::{net::SocketAddr, path::Path};
+use reservation_service::start_server;
+use std::path::Path;
 
 use abi::Config;
 use anyhow::Result;
@@ -22,16 +22,5 @@ async fn main() -> Result<()> {
 
     let config = Config::load(&filename)?;
 
-    let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port).parse()?;
-
-    let svc = RsvpService::from_config(&config).await?;
-    let svc = abi::reservation_service_server::ReservationServiceServer::new(svc);
-
-    println!("Listening on {}", addr);
-
-    tonic::transport::Server::builder()
-        .add_service(svc)
-        .serve(addr)
-        .await?;
-    Ok(())
+    start_server(&config).await
 }

@@ -2,13 +2,13 @@ use abi::{Config, ListenResponse, Reservation};
 use anyhow::Error;
 use futures::stream::Stream;
 use reservation::ReservationManager;
-use std::{pin::Pin, task::Poll};
+use std::{net::SocketAddr, pin::Pin, task::Poll};
 use tokio::sync::mpsc;
 use tonic::Status;
 
 mod service;
 
-mod test_util;
+pub mod test_util;
 
 pub type ReservationStream = Pin<Box<dyn Stream<Item = Result<Reservation, Status>> + Send>>;
 pub type ListenStream = Pin<Box<dyn Stream<Item = Result<ListenResponse, Status>> + Send>>;
@@ -48,4 +48,19 @@ impl<T> Stream for TonicReceiverStream<T> {
             Poll::Pending => Poll::Pending,
         }
     }
+}
+
+pub async fn start_server(config: &Config) -> Result<(), Error> {
+    let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port).parse()?;
+
+    let svc = RsvpService::from_config(config).await?;
+    let svc = abi::reservation_service_server::ReservationServiceServer::new(svc);
+
+    println!("Listening on {}", addr);
+
+    tonic::transport::Server::builder()
+        .add_service(svc)
+        .serve(addr)
+        .await?;
+    Ok(())
 }

@@ -137,7 +137,7 @@ mod tests {
     use abi::{Reservation, ReservationStatus};
 
     use super::*;
-    use crate::test_util::tests::TestConfig;
+    use crate::test_util::TestConfig;
 
     #[tokio::test]
     async fn rpc_reserve_should_work() {

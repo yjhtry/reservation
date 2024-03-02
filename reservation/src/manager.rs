@@ -171,6 +171,11 @@ impl Rsvp for ReservationManager {
         .fetch_all(&self.pool)
         .await?;
 
+        let total = sqlx::query("SELECT COUNT(*) FROM rsvp.reservations")
+            .fetch_one(&self.pool)
+            .await?
+            .get::<i64, _>(0);
+
         if query.is_desc {
             rsvps.reverse();
         }
@@ -192,7 +197,7 @@ impl Rsvp for ReservationManager {
             prev,
             next,
             // TODO optimize total sum
-            total: 0,
+            total,
         };
 
         Ok((pager, rsvps))

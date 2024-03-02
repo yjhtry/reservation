@@ -32,7 +32,7 @@ impl Reservation {
         note: impl Into<String>,
     ) -> Self {
         Self {
-            id: 0,
+            id: 1,
             user_id: uid.into(),
             resource_id: rid.into(),
             start: Some(convert_to_timestamp(start.with_timezone(&Utc))),

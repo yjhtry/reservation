@@ -56,6 +56,16 @@ impl Config {
     }
 }
 
+impl ServerConfig {
+    pub fn url(&self, https: bool) -> String {
+        if https {
+            format!("https://{}:{}", self.host, self.port)
+        } else {
+            format!("http://{}:{}", self.host, self.port)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
