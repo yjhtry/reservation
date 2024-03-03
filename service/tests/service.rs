@@ -1,3 +1,6 @@
+#[path = "../src/test_util.rs"]
+mod test_utils;
+
 use std::time::Duration;
 use tokio::time;
 
@@ -6,7 +9,9 @@ use abi::{
     ReservationStatus, ReserveRequest,
 };
 
-use reservation_service::{start_server, test_util::TestConfig};
+use test_utils::TestConfig;
+
+use reservation_service::start_server;
 
 #[tokio::test]
 async fn grpc_server_should_work() {
