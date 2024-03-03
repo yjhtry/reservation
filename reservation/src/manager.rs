@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use tokio::sync::mpsc;
 
-use abi::{ReservationStatus, Validator};
+use abi::{convert_to_utc_time, ReservationStatus, Validator};
 use async_trait::async_trait;
 use sqlx::{Either, Row};
 
@@ -110,18 +110,20 @@ impl Rsvp for ReservationManager {
         &self,
         query: abi::ReservationQuery,
     ) -> mpsc::Receiver<Result<abi::Reservation, abi::Error>> {
-        let timespan = query.get_timespan();
+        let start = query.start.map(|v| convert_to_utc_time(&v));
+        let end = query.end.map(|v| convert_to_utc_time(&v));
         let status =
             ReservationStatus::try_from(query.status).unwrap_or(ReservationStatus::Pending);
 
         let (tx, rx) = mpsc::channel(128);
 
         let mut rsvps = sqlx::query_as(
-            "SELECT * FROM rsvp.query($1, $2, $3, $4::rsvp.reservation_status, $5, $6, $7)",
+            "SELECT * FROM rsvp.query($1, $2, $3, $4, $5::rsvp.reservation_status, $6, $7, $8)",
         )
         .bind(str_to_option(&query.user_id))
         .bind(str_to_option(&query.resource_id))
-        .bind(timespan)
+        .bind(start)
+        .bind(end)
         .bind(status.to_string())
         .bind(query.is_desc)
         .bind(query.page)

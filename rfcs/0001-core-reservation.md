@@ -208,7 +208,8 @@ FOR EACH ROW EXECUTE PROCEDURE rsvp.update_updated_at_column();
 CREATE OR REPLACE FUNCTION rsvp.query(
     uid varchar(64),
     rid varchar(64),
-    during TSTZRANGE,
+    _start timestamp with time zone,
+    _end timestamp with time zone,
     status rsvp.reservation_status DEFAULT 'pending',
     is_desc boolean DEFAULT false,
     page integer DEFAULT 1,
@@ -217,6 +218,7 @@ CREATE OR REPLACE FUNCTION rsvp.query(
 AS $$
 DECLARE
     _sql TEXT;
+    _during TSTZRANGE;
 BEGIN
     -- if page is less than 1, set it to 1
     IF page < 1 THEN
@@ -228,11 +230,17 @@ BEGIN
         page_size := 1;
     END IF;
 
+    -- if start is null, set it to -infinity, and if end is null, set it to infinity
+    _during := TSTZRANGE(
+        COALESCE(_start, '-infinity'::timestamp with time zone),
+        COALESCE(_end, 'infinity'::timestamp with time zone)
+    );
+
     -- format the sql query based on the parameters
     _sql := format(
         'SELECT * FROM rsvp.reservations WHERE %L @> timespan AND status = %L::rsvp.reservation_status AND %s
          ORDER BY lower(timespan) %s LIMIT %L::integer OFFSET %L::integer',
-         during,
+         _during,
          status,
         CASE
             WHEN rid IS NOT NULL AND uid IS NOT NULL THEN
@@ -272,8 +280,8 @@ AS $$
 DECLARE
     _sql TEXT;
 BEGIN
-    -- if cursor is less is null when is_desc is true, set it to int64 max or 0
-    IF cursor IS NULL THEN
+    -- if cursor is less than 1 or is null when is_desc is true, set it to int64 max or 0
+    IF cursor IS NULL OR cursor <= 0 THEN
         IF is_desc THEN
             cursor := 9223372036854775807;
         ELSE
@@ -289,7 +297,7 @@ BEGIN
     -- format the sql query based on the parameters
     _sql := format(
         'SELECT * FROM rsvp.reservations WHERE %s AND status = %L::rsvp.reservation_status AND %s
-         ORDER BY id %s LIMIT %L::integer',
+        ORDER BY id %s LIMIT %L::integer',
          CASE
             WHEN is_desc THEN 'id < ' || cursor
             ELSE 'id > ' || cursor

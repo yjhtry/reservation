@@ -1,7 +1,8 @@
 CREATE OR REPLACE FUNCTION rsvp.query(
     uid varchar(64),
     rid varchar(64),
-    during TSTZRANGE,
+    _start timestamp with time zone,
+    _end timestamp with time zone,
     status rsvp.reservation_status DEFAULT 'pending',
     is_desc boolean DEFAULT false,
     page integer DEFAULT 1,
@@ -10,6 +11,7 @@ CREATE OR REPLACE FUNCTION rsvp.query(
 AS $$
 DECLARE
     _sql TEXT;
+    _during TSTZRANGE;
 BEGIN
     -- if page is less than 1, set it to 1
     IF page < 1 THEN
@@ -21,11 +23,17 @@ BEGIN
         page_size := 1;
     END IF;
 
+    -- if start is null, set it to -infinity, and if end is null, set it to infinity
+    _during := TSTZRANGE(
+        COALESCE(_start, '-infinity'::timestamp with time zone),
+        COALESCE(_end, 'infinity'::timestamp with time zone)
+    );
+
     -- format the sql query based on the parameters
     _sql := format(
         'SELECT * FROM rsvp.reservations WHERE %L @> timespan AND status = %L::rsvp.reservation_status AND %s
          ORDER BY lower(timespan) %s LIMIT %L::integer OFFSET %L::integer',
-         during,
+         _during,
          status,
         CASE
             WHEN rid IS NOT NULL AND uid IS NOT NULL THEN

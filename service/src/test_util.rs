@@ -1,11 +1,11 @@
 use abi::Config;
 use sqlx::{Connection, Executor, PgConnection};
-use std::{ops::Deref, sync::Arc, thread};
+use std::{ops::Deref, thread};
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 
 pub struct TestConfig {
-    pub config: Arc<Config>,
+    pub config: Config,
 }
 
 impl Deref for TestConfig {
@@ -48,9 +48,14 @@ impl TestConfig {
         .join()
         .expect("failed to create database");
 
-        Self {
-            config: Arc::new(config),
-        }
+        Self { config }
+    }
+
+    pub fn with_server_port(port: u16) -> Self {
+        let mut config = TestConfig::default();
+        config.config.server.port = port;
+
+        config
     }
 }
 

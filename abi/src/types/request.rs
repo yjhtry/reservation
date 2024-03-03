@@ -1,4 +1,7 @@
-use crate::{ConfirmRequest, FilterRequest, Reservation, ReservationFilter, ReserveRequest};
+use crate::{
+    ConfirmRequest, FilterRequest, QueryRequest, Reservation, ReservationFilter, ReservationQuery,
+    ReserveRequest,
+};
 
 macro_rules! impl_new {
     ($name:ident, $field:ident, $type:ty) => {
@@ -21,4 +24,5 @@ macro_rules! impl_new {
 
 impl_new!(ReserveRequest, reservation, Reservation);
 impl_new!(FilterRequest, filter, ReservationFilter);
+impl_new!(QueryRequest, query, ReservationQuery);
 impl_new!(ConfirmRequest);
