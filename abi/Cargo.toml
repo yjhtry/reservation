@@ -18,4 +18,5 @@ thiserror = "1.0.56"
 tonic = { version = "0.10.2", features = ["gzip"] }
 
 [build-dependencies]
-tonic-build = "0.10.2"
+tonic-build = "0.11.0"
+tonic-build-extend = "0.1.0"

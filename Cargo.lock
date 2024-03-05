@@ -17,6 +17,7 @@ dependencies = [
  "thiserror",
  "tonic",
  "tonic-build",
+ "tonic-build-extend",
 ]
 
 [[package]]
@@ -2415,15 +2416,24 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.10.2"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d021fc044c18582b9a2408cd0dd05b1596e3ecdb5c4df822bb0183545683889"
+checksum = "be4ef6dd70a610078cb4e338a0f79d06bc759ff1b22d2120c2ff02ae264ba9c2"
 dependencies = [
  "prettyplease",
  "proc-macro2",
  "prost-build",
  "quote",
  "syn 2.0.48",
+]
+
+[[package]]
+name = "tonic-build-extend"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2bfcb0a589679ef04c43f66400a2c8aa534aa1aa45db5468e438b05464c6480"
+dependencies = [
+ "tonic-build",
 ]
 
 [[package]]

@@ -1,9 +1,5 @@
 use std::process::Command;
-
-trait BuilderExt {
-    fn types_attributes(self, paths: &[&str], attributes: &[&str]) -> Self;
-    fn fields_attributes(self, path: &[&str], fields: &[&str], attributes: &[&str]) -> Self;
-}
+use tonic_build_extend::BuilderExt;
 
 fn main() {
     tonic_build::configure()
@@ -61,26 +57,6 @@ fn main() {
         .expect("Failed to run cargo fmt");
 
     println!("cargo:rerun-if-changed=protos/reservation.proto");
-}
-
-impl BuilderExt for tonic_build::Builder {
-    fn types_attributes(self, paths: &[&str], attributes: &[&str]) -> Self {
-        paths.iter().fold(self, |acc, path| {
-            attributes
-                .iter()
-                .fold(acc, |acc, attribute| acc.type_attribute(path, attribute))
-        })
-    }
-
-    fn fields_attributes(self, path: &[&str], fields: &[&str], attributes: &[&str]) -> Self {
-        path.iter().fold(self, |acc, path| {
-            fields.iter().fold(acc, |acc, field| {
-                attributes.iter().fold(acc, |acc, attribute| {
-                    acc.field_attribute(format!("{}.{}", path, field), attribute)
-                })
-            })
-        })
-    }
 }
 
 #[cfg(test)]
