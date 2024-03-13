@@ -18,3 +18,4 @@ tokio = { version = "1.35.1", features = ["full"] }
 [dev-dependencies]
 sqlx-database-tester = { version = "0.4.2", features = ["runtime-tokio"] }
 tokio = { version = "1.35.1", features = ["full"] }
+dotenvy = "0.15.7"

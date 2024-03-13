@@ -1552,6 +1552,7 @@ dependencies = [
  "abi",
  "anyhow",
  "async-trait",
+ "dotenvy",
  "futures",
  "prost-types",
  "sqlx 0.6.3",
